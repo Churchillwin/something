@@ -1453,6 +1453,12 @@ function setStylePropertyIfChanged(node, name, value) {
   node.style.setProperty(name, value);
 }
 
+function setHTMLIfChanged(node, html) {
+  if (!node || node.__lastHTML === html) return;
+  node.__lastHTML = html;
+  node.innerHTML = html;
+}
+
 function runVisualAnimation(promise) {
   Promise.resolve(promise).catch(() => {});
 }
@@ -3212,8 +3218,14 @@ function render() {
     state.taps >= MAX_TAPS ? "1 трлн достигнут" : nextReward ? formatTapGoal(nextReward) : "все открыто";
   els.rewardProgress.style.width = `${Math.max(0, Math.min(100, getRewardPercent()))}%`;
 
-  els.tapButton.className = `tap-button ${activeSkin.className}`;
-  els.tapImage.src = activeSkin.image;
+  if (els.tapButton.dataset.skinClass !== activeSkin.className) {
+    if (els.tapButton.dataset.skinClass) els.tapButton.classList.remove(els.tapButton.dataset.skinClass);
+    els.tapButton.classList.add(activeSkin.className);
+    els.tapButton.dataset.skinClass = activeSkin.className;
+  }
+  if (els.tapImage.getAttribute("src") !== activeSkin.image) {
+    els.tapImage.src = activeSkin.image;
+  }
   renderCoinCosmetics();
   renderCompanion();
   renderAchievements();
@@ -3305,24 +3317,29 @@ function isCardUnlocked(card) {
 function renderAchievements() {
   const unlockedCount = state.unlockedAchievements.length;
   els.achievementSummary.textContent = `${unlockedCount}/${achievements.length}`;
-  els.achievementList.innerHTML = achievements
-    .map((achievement, index) => {
-      const unlocked = state.unlockedAchievements.includes(achievement.id);
-      return `
-        <article class="achievement ${unlocked ? "is-unlocked" : "is-locked"}" title="${achievement.description}">
-          <span class="achievement-num" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span>
-          <strong>${achievement.title}</strong>
-          <span class="status-dot" aria-label="${unlocked ? "Открыта" : "Закрыта"}"></span>
-        </article>
-      `;
-    })
-    .join("");
+  setHTMLIfChanged(
+    els.achievementList,
+    achievements
+      .map((achievement, index) => {
+        const unlocked = state.unlockedAchievements.includes(achievement.id);
+        return `
+          <article class="achievement ${unlocked ? "is-unlocked" : "is-locked"}" title="${achievement.description}">
+            <span class="achievement-num" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span>
+            <strong>${achievement.title}</strong>
+            <span class="status-dot" aria-label="${unlocked ? "Открыта" : "Закрыта"}"></span>
+          </article>
+        `;
+      })
+      .join(""),
+  );
 }
 
 function renderCards() {
   const unlockedCount = cards.filter((card) => isCardUnlocked(card)).length;
   els.cardSummary.textContent = `${unlockedCount}/${cards.length}`;
-  els.cardGrid.innerHTML = cards
+  setHTMLIfChanged(
+    els.cardGrid,
+    cards
     .map((card) => {
       const unlocked = isCardUnlocked(card);
       const hasImage = unlocked && Boolean(card.image);
@@ -3348,13 +3365,16 @@ function renderCards() {
         </article>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function renderSkins() {
   const unlockedCount = state.unlockedSkins.length;
   els.skinSummary.textContent = `${unlockedCount}/${skins.length}`;
-  els.skinGrid.innerHTML = skins
+  setHTMLIfChanged(
+    els.skinGrid,
+    skins
     .map((skin) => {
       const unlocked = state.unlockedSkins.includes(skin.id);
       const active = state.activeSkin === skin.id;
@@ -3380,7 +3400,8 @@ function renderSkins() {
         </${tag}>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function renderCompanionOutfits() {
@@ -3389,7 +3410,9 @@ function renderCompanionOutfits() {
   if (!COMPANION_ENABLED) return;
   const unlockedCount = state.unlockedCompanionOutfits.length;
   els.companionOutfitSummary.textContent = `${unlockedCount}/${companionOutfits.length}`;
-  els.companionOutfitGrid.innerHTML = companionOutfits
+  setHTMLIfChanged(
+    els.companionOutfitGrid,
+    companionOutfits
     .map((outfit) => {
       const unlocked = state.unlockedCompanionOutfits.includes(outfit.id);
       const active = state.activeCompanionOutfit === outfit.id;
@@ -3409,13 +3432,16 @@ function renderCompanionOutfits() {
         </button>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function renderBackdrops() {
   const unlockedCount = state.unlockedBackdrops.length;
   els.backdropSummary.textContent = `${unlockedCount}/${coinBackdrops.length}`;
-  els.backdropGrid.innerHTML = coinBackdrops
+  setHTMLIfChanged(
+    els.backdropGrid,
+    coinBackdrops
     .map((backdrop) => {
       const unlocked = state.unlockedBackdrops.includes(backdrop.id);
       const active = state.activeBackdrop === backdrop.id;
@@ -3433,13 +3459,16 @@ function renderBackdrops() {
         </button>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function renderTapEffects() {
   const unlockedCount = state.unlockedTapEffects.length;
   els.tapEffectSummary.textContent = `${unlockedCount}/${tapEffects.length}`;
-  els.tapEffectGrid.innerHTML = tapEffects
+  setHTMLIfChanged(
+    els.tapEffectGrid,
+    tapEffects
     .map((effect) => {
       const unlocked = state.unlockedTapEffects.includes(effect.id);
       const active = state.activeTapEffect === effect.id;
@@ -3457,7 +3486,8 @@ function renderTapEffects() {
         </button>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function renderMatch3() {
@@ -3508,7 +3538,9 @@ function renderMatch3() {
     els.chestStatus.textContent = `${formatShort(state.match3Energy)}/${formatShort(CHEST_COST)}, гарант ${pityLeft}`;
   }
 
-  els.match3Board.innerHTML = state.match3Board
+  setHTMLIfChanged(
+    els.match3Board,
+    state.match3Board
     .map((cellValue, index) => {
       const cell = normalizeCell(cellValue);
       const selected = selectedGemIndex === index;
@@ -3582,7 +3614,8 @@ function renderMatch3() {
         </button>
       `;
     })
-    .join("");
+    .join(""),
+  );
 }
 
 function createEmptyTetrisBoard() {
