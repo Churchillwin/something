@@ -1,0 +1,17 @@
+{
+  "name": "Anime Tap Clicker",
+  "short_name": "Anime Tap",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "description": "Lightweight anime-style clicker with achievements, collectible cards, and tap skins.",
+  "icons": [
+    {
+      "src": "assets/anime-tap-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

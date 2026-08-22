@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Anime Tap Clicker</title>
+    <meta name="theme-color" content="#111827" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="preload" href="assets/anime-tap-core.webp" as="image" />
+    <link rel="preload" href="assets/skin-sakura.webp" as="image" />
+    <link rel="preload" href="assets/skin-gold.webp" as="image" />
+    <link rel="preload" href="assets/skin-mint.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-idle.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-lean.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-magic.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-cute.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-sleep.webp" as="image" />
+    <link rel="preload" href="assets/companion-aliya-focus.webp" as="image" />
+    <link rel="preload" href="assets/aliya-coin-hug.png" as="image" />
+    <link rel="preload" href="assets/aliya-coin-guard.png" as="image" />
+    <link rel="preload" href="assets/aliya-coin-point.png" as="image" />
+    <link rel="preload" href="assets/card-aliya.webp" as="image" />
+    <link rel="preload" href="assets/coin-backdrop-guild.webp" as="image" />
+    <link rel="preload" href="assets/coin-backdrop-ruins.webp" as="image" />
+    <link rel="preload" href="assets/coin-backdrop-forge.webp" as="image" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Anime Tap Clicker">
+      <section class="stage-panel" aria-label="Игровая зона">
+        <div class="topbar">
+          <div>
+            <p class="kicker">Anime Tap Clicker</p>
+            <h1>Тапай ядро</h1>
+          </div>
+          <button class="icon-button" id="pauseButton" type="button" aria-label="Пауза" title="Пауза">
+            <span aria-hidden="true">⏸</span>
+          </button>
+          <button class="icon-button" id="resetButton" type="button" aria-label="Сбросить прогресс" title="Сбросить прогресс">
+            <span aria-hidden="true">↺</span>
+          </button>
+        </div>
+
+        <div class="tap-total" id="tapTotal" aria-label="Счет">
+          <span class="label">Тапы</span>
+          <strong id="tapCount">0</strong>
+        </div>
+
+        <div class="tap-zone">
+          <div class="coin-backdrop" id="coinBackdrop" hidden aria-hidden="true"></div>
+          <div class="aura aura-one"></div>
+          <div class="aura aura-two"></div>
+          <button class="tap-button skin-crystal" id="tapButton" type="button" aria-label="Тапнуть">
+            <img src="assets/anime-tap-core.webp" alt="" />
+            <span class="tap-gloss"></span>
+          </button>
+          <div class="tap-feedback" id="tapFeedback" aria-hidden="true"></div>
+          <article class="companion-stage" id="companionCard" data-companion-pose="idle" hidden aria-label="Персонаж-компаньон">
+            <div class="companion-breath">
+              <div class="companion-poses" id="companionPoses">
+                <img class="companion-pose is-active" data-pose="idle" src="assets/companion-aliya-idle.webp" alt="Алия, персонаж-компаньон" />
+                <img class="companion-pose" data-pose="lean" src="assets/companion-aliya-lean.webp" alt="" aria-hidden="true" />
+                <img class="companion-pose" data-pose="magic" src="assets/companion-aliya-magic.webp" alt="" aria-hidden="true" />
+                <img class="companion-pose" data-pose="cute" src="assets/companion-aliya-cute.webp" alt="" aria-hidden="true" />
+                <img class="companion-pose" data-pose="sleep" src="assets/companion-aliya-sleep.webp" alt="" aria-hidden="true" />
+                <img class="companion-pose" data-pose="focus" src="assets/companion-aliya-focus.webp" alt="" aria-hidden="true" />
+              </div>
+              <span class="companion-limb-layer companion-head-layer" aria-hidden="true"></span>
+              <span class="companion-limb-layer companion-arm-layer" aria-hidden="true"></span>
+              <span class="companion-limb-layer companion-leg-layer" aria-hidden="true"></span>
+              <span class="companion-eye companion-eye-left" aria-hidden="true"></span>
+              <span class="companion-eye companion-eye-right" aria-hidden="true"></span>
+              <span class="companion-spell-orbit" aria-hidden="true"></span>
+              <div class="pixel-companion" aria-hidden="true">
+                <img class="aliya-cutout" id="aliyaCutout" src="assets/aliya-outfit-base.png" alt="" decoding="async" />
+              </div>
+              <span class="companion-coin-scene" aria-hidden="true"></span>
+              <span class="companion-magic-field" aria-hidden="true"></span>
+              <span class="companion-speech" id="companionLine" aria-live="polite"></span>
+            </div>
+            <div class="companion-nameplate">
+              <strong>Алия</strong>
+              <span id="companionMood">следит за ритмом</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="progress-card">
+          <div class="progress-copy">
+            <span class="label">Следующая награда</span>
+            <strong id="nextRewardLabel">25 тапов</strong>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <span id="rewardProgress"></span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel" aria-label="Коллекция и достижения">
+        <nav class="tabs" aria-label="Разделы">
+          <button class="tab is-active" type="button" data-tab="achievements">Ачивки</button>
+          <button class="tab" type="button" data-tab="cards">Карты</button>
+          <button class="tab" type="button" data-tab="skins">Скины</button>
+          <span class="tab-corner-group">
+            <button class="tab tab-corner" id="match3Tab" type="button" data-tab="match3" aria-label="Три в ряд" title="Три в ряд">
+              <span aria-hidden="true">↙</span>
+            </button>
+            <button class="tab tab-corner" id="tetrisTab" type="button" data-tab="tetris" aria-label="Тетрис" title="Тетрис">
+              <span aria-hidden="true">↘</span>
+            </button>
+          </span>
+        </nav>
+
+        <section class="tab-panel is-active" id="achievementsPanel" data-panel="achievements" aria-label="Ачивки">
+          <div class="section-title">
+            <h2>Ачивки</h2>
+            <span id="achievementSummary">0/0</span>
+          </div>
+          <div class="list" id="achievementList"></div>
+        </section>
+
+        <section class="tab-panel" id="cardsPanel" data-panel="cards" aria-label="Карточки">
+          <div class="section-title">
+            <h2>Карточки</h2>
+            <span id="cardSummary">0/0</span>
+          </div>
+          <div class="card-grid" id="cardGrid"></div>
+        </section>
+
+        <section class="tab-panel" id="skinsPanel" data-panel="skins" aria-label="Скины">
+          <div class="section-title">
+            <h2>Скины</h2>
+            <span id="skinSummary">0/0</span>
+          </div>
+          <div class="skin-grid" id="skinGrid"></div>
+          <div id="companionOutfitSection" hidden>
+            <div class="section-title compact-title">
+              <h2>Костюмы Алиии</h2>
+              <span id="companionOutfitSummary">0/0</span>
+            </div>
+            <div class="companion-outfit-grid" id="companionOutfitGrid"></div>
+          </div>
+          <div class="section-title compact-title">
+            <h2>Фон сцены</h2>
+            <span id="backdropSummary">0/0</span>
+          </div>
+          <div class="cosmetic-grid" id="backdropGrid"></div>
+          <div class="section-title compact-title">
+            <h2>Анимация тапа</h2>
+            <span id="tapEffectSummary">0/0</span>
+          </div>
+          <div class="cosmetic-grid" id="tapEffectGrid"></div>
+        </section>
+
+        <section class="tab-panel" id="match3Panel" data-panel="match3" aria-label="Три в ряд">
+          <div class="section-title match3-title">
+            <h2>Три в ряд</h2>
+            <div class="match3-title-actions">
+              <button class="match3-tool-button match3-shuffle-button" id="match3ShuffleButton" type="button" aria-label="Перемешать поле" title="Перемешать поле" disabled>
+                <span aria-hidden="true">⇄</span>
+              </button>
+              <button class="match3-tool-button match3-focus-button" id="match3FocusButton" type="button" aria-label="Развернуть поле три в ряд" title="Развернуть поле три в ряд" disabled>
+                <span aria-hidden="true">↗</span>
+              </button>
+              <span id="match3Summary">100 млн</span>
+            </div>
+          </div>
+
+          <div class="locked-sector" id="match3Locked">
+            <strong>Сектор закрыт</strong>
+            <span>Откроется за 100 млн тапов</span>
+          </div>
+
+          <div class="match3-game" id="match3Game" hidden>
+            <div class="match3-stats">
+              <div>
+                <span class="label">Энергия</span>
+                <strong id="match3Energy">0</strong>
+              </div>
+              <div>
+                <span class="label">Сундуки</span>
+                <strong id="chestCount">0</strong>
+              </div>
+            </div>
+
+            <div class="match3-board" id="match3Board" aria-label="Поле три в ряд"></div>
+
+            <div class="chest-panel">
+              <div class="chest-topline">
+                <div>
+                  <span class="label">Сундук персонажа</span>
+                  <strong id="chestStatus">0/1200</strong>
+                </div>
+                <button class="chest-button" id="chestButton" type="button">Открыть</button>
+              </div>
+              <div class="progress-track" aria-hidden="true">
+                <span id="chestProgress"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tetrisPanel" data-panel="tetris" aria-label="Тетрис">
+          <div class="section-title">
+            <h2>Тетрис</h2>
+            <span id="tetrisSummary">1 млрд</span>
+          </div>
+
+          <div class="locked-sector" id="tetrisLocked">
+            <strong>Сектор готовится</strong>
+            <span>Откроется за 1 млрд тапов</span>
+          </div>
+
+          <div class="tetris-game" id="tetrisGame" hidden>
+            <div class="tetris-stats">
+              <div>
+                <span class="label">Линии</span>
+                <strong id="tetrisLines">0</strong>
+              </div>
+              <div>
+                <span class="label">Счет</span>
+                <strong id="tetrisScore">0</strong>
+              </div>
+              <button class="tetris-tool-button" id="tetrisRestartButton" type="button" aria-label="Начать заново" title="Начать заново">
+                <span aria-hidden="true">↺</span>
+              </button>
+            </div>
+
+            <div class="tetris-board" id="tetrisBoard" aria-label="Поле тетриса">
+              <div class="tetris-board-cells" id="tetrisBoardCells" aria-hidden="true"></div>
+              <div class="tetris-active-piece" id="tetrisActivePiece" aria-hidden="true"></div>
+              <div class="tetris-overlay" id="tetrisOverlay" hidden>
+                <strong>Игра окончена</strong>
+                <button class="tetris-tool-button tetris-overlay-button" id="tetrisPlayAgainButton" type="button">Заново</button>
+              </div>
+            </div>
+
+            <div class="tetris-controls">
+              <button class="tetris-pad-button" id="tetrisLeftButton" type="button" aria-label="Влево">
+                <span aria-hidden="true">◀</span>
+              </button>
+              <button class="tetris-pad-button" id="tetrisRotateButton" type="button" aria-label="Повернуть">
+                <span aria-hidden="true">⟳</span>
+              </button>
+              <button class="tetris-pad-button" id="tetrisRightButton" type="button" aria-label="Вправо">
+                <span aria-hidden="true">▶</span>
+              </button>
+              <button class="tetris-pad-button" id="tetrisSoftDropButton" type="button" aria-label="Мягкое падение">
+                <span aria-hidden="true">▼</span>
+              </button>
+              <button class="tetris-pad-button tetris-pad-wide" id="tetrisHardDropButton" type="button" aria-label="Сбросить фигуру">
+                <span aria-hidden="true">⤓</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+    <template id="sparkTemplate">
+      <span class="spark"></span>
+    </template>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
