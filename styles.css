@@ -1395,10 +1395,18 @@ h2 {
   width: min(68vw, 440px);
   aspect-ratio: 1;
   border-radius: 50%;
+  overflow: hidden;
   pointer-events: none;
+  /* WebKit sometimes shows the square compositing-layer bounds of a
+     blurred + animated child instead of clipping it to this circle, so the
+     blur/rotation lives on ::before, inset past the edge, inside this
+     overflow:hidden circle rather than directly on the animated element. */
 }
 
-.aura-one {
+.aura-one::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
   background:
     radial-gradient(circle, color-mix(in srgb, var(--theme-a) 14%, transparent), transparent 62%),
     conic-gradient(from 40deg, transparent, color-mix(in srgb, var(--theme-b) 16%, transparent), transparent, color-mix(in srgb, var(--theme-c) 12%, transparent), transparent);
@@ -1410,11 +1418,17 @@ h2 {
 .aura-two {
   width: min(50vw, 310px);
   border: 0;
-  background: radial-gradient(circle, color-mix(in srgb, var(--theme-a) 18%, transparent), transparent 68%);
-  filter: blur(16px);
   box-shadow:
     0 0 28px color-mix(in srgb, var(--theme-a) 16%, transparent),
     inset 0 0 28px rgba(184, 152, 255, 0.06);
+}
+
+.aura-two::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--theme-a) 18%, transparent), transparent 68%);
+  filter: blur(16px);
   opacity: 0.5;
   animation: breathe 3.2s ease-in-out infinite;
 }
