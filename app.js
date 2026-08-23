@@ -510,6 +510,14 @@ const interfaceSkinProducts = {
   },
 };
 
+// Water-surface palettes for the coin overlay, included free with the
+// Liquid Core purchase (no extra charge - one product, three looks).
+const liquidCoinVariants = [
+  { id: "lagoon", title: "Лагуна", colors: ["#34e0c4", "#1fb7c9"] },
+  { id: "abyss", title: "Пучина", colors: ["#2f7fd6", "#4c3fd1"] },
+  { id: "sunset", title: "Закат", colors: ["#ffd166", "#ff8a5b"] },
+];
+
 const rewardMilestones = [
     ...new Set([
       ...achievements.map((achievement) => achievement.threshold),
@@ -547,6 +555,7 @@ const defaultState = {
   interfaceSkin: "default",
   ownedInterfaceSkins: [],
   effectsIntensity: "full",
+  liquidCoinVariant: "lagoon",
 };
 
 const els = {
@@ -579,6 +588,7 @@ const els = {
   tapEffectSummary: document.querySelector("#tapEffectSummary"),
   interfaceSkinGrid: document.querySelector("#interfaceSkinGrid"),
   interfaceSkinSummary: document.querySelector("#interfaceSkinSummary"),
+  liquidCoinVariantRow: document.querySelector("#liquidCoinVariantRow"),
   effectsIntensityToggle: document.querySelector("#effectsIntensityToggle"),
   companionOutfitSection: document.querySelector("#companionOutfitSection"),
   companionOutfitGrid: document.querySelector("#companionOutfitGrid"),
@@ -714,6 +724,9 @@ function loadState() {
     const effectsIntensity = ["full", "simplified", "off"].includes(saved?.effectsIntensity)
       ? saved.effectsIntensity
       : "full";
+    const liquidCoinVariant = liquidCoinVariants.some((variant) => variant.id === saved?.liquidCoinVariant)
+      ? saved.liquidCoinVariant
+      : "lagoon";
 
     return {
       ...defaultState,
@@ -740,6 +753,7 @@ function loadState() {
       ownedInterfaceSkins,
       interfaceSkin,
       effectsIntensity,
+      liquidCoinVariant,
       combo: 1,
       lastTapAt: 0,
     };
@@ -2798,7 +2812,7 @@ function playLiquidTapEffect(buttonRect, tapX, tapY, clientX, clientY) {
   const finished = animateNode(
     ripple,
     [
-      { transform: "translate(-50%, -50%) scale(0.15)", opacity: 0.55 },
+      { transform: "translate(-50%, -50%) scale(0.15)", opacity: 0.38 },
       { transform: "translate(-50%, -50%) scale(1)", opacity: 0 },
     ],
     { duration: rippleDuration, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
@@ -3353,6 +3367,40 @@ function applyInterfaceSkin() {
   if (document.body.dataset.effects !== effectiveIntensity) {
     document.body.dataset.effects = effectiveIntensity;
   }
+  if (document.body.dataset.liquidCoin !== state.liquidCoinVariant) {
+    document.body.dataset.liquidCoin = state.liquidCoinVariant;
+  }
+}
+
+function setLiquidCoinVariant(variantId) {
+  if (!isThemeOwned("liquid") || !liquidCoinVariants.some((variant) => variant.id === variantId)) return;
+  if (state.liquidCoinVariant === variantId) return;
+  state.liquidCoinVariant = variantId;
+  saveState();
+  applyInterfaceSkin();
+  render();
+}
+
+function renderLiquidCoinVariants() {
+  if (!els.liquidCoinVariantRow) return;
+  const owned = isThemeOwned("liquid");
+  els.liquidCoinVariantRow.hidden = !owned;
+  if (!owned) return;
+
+  setHTMLIfChanged(
+    els.liquidCoinVariantRow,
+    liquidCoinVariants
+      .map((variant) => {
+        const active = state.liquidCoinVariant === variant.id;
+        return `
+          <button class="liquid-coin-variant-option ${active ? "is-active" : ""}" type="button" data-liquid-coin-variant="${variant.id}" style="--accent-a:${variant.colors[0]};--accent-b:${variant.colors[1]}" title="${variant.title}">
+            <span class="liquid-coin-variant-swatch" aria-hidden="true"></span>
+            <span>${variant.title}</span>
+          </button>
+        `;
+      })
+      .join(""),
+  );
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -3439,6 +3487,53 @@ function renderInterfaceSkins() {
   }
 }
 
+// Temporary visual-QA aid, NOT a real feature: unlocks every cosmetic
+// locally so appearance can be checked without paying. Only ever renders
+// behind an obscure `?debugSkins=1` query param, and even then it's inert
+// for real purchases - inside real Telegram, fetchOwnedInterfaceSkins()
+// overwrites state.ownedInterfaceSkins from the server on every load, so
+// this can't be used to fake server-side ownership, only to preview looks
+// locally where there's no backend/initData to sync against.
+// Remove this whole block (and its call at the bottom of the file) once
+// visual QA on Liquid Core is done.
+function initDebugBypassPanel() {
+  if (!new URLSearchParams(location.search).has("debugSkins")) return;
+
+  const panel = document.createElement("div");
+  panel.style.cssText =
+    "position:fixed;top:8px;left:8px;z-index:999;display:flex;gap:6px;flex-wrap:wrap;max-width:260px;padding:8px;border-radius:10px;background:rgba(10,14,22,0.92);border:1px solid rgba(255,209,102,0.5);font-family:sans-serif;";
+  const buttonStyle =
+    "font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;background:#ffd166;color:#101827;font-weight:800;border:1px solid rgba(0,0,0,0.3);";
+  panel.innerHTML = `
+    <strong style="width:100%;color:#ffd166;font-size:11px;">🧪 ТЕСТ-РЕЖИМ (временно, не для игроков)</strong>
+    <button type="button" data-debug-action="grant-all" style="${buttonStyle}">Выдать всё</button>
+    <button type="button" data-debug-action="reset" style="${buttonStyle}">Сброс теста</button>
+  `;
+  document.body.append(panel);
+
+  panel.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-debug-action]")?.dataset.debugAction;
+    if (action === "grant-all") {
+      state.unlockedAchievements = achievements.map((item) => item.id);
+      state.unlockedCards = cards.map((item) => item.id);
+      state.unlockedSkins = skins.map((item) => item.id);
+      state.unlockedBackdrops = coinBackdrops.map((item) => item.id);
+      state.unlockedTapEffects = tapEffects.map((item) => item.id);
+      state.unlockedCompanionOutfits = companionOutfits.map((item) => item.id);
+      state.companionUnlocked = true;
+      state.ownedInterfaceSkins = Object.keys(themeRegistry).filter((id) => id !== "default");
+      state.match3EverUnlocked = true;
+      state.tetrisEverUnlocked = true;
+      saveState();
+      render();
+      showToast("Тест-режим", "Выдано всё для просмотра");
+    } else if (action === "reset") {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  });
+}
+
 function render() {
   applyInterfaceSkin();
   const activeSkin = getActiveSkin();
@@ -3466,6 +3561,7 @@ function render() {
   renderBackdrops();
   renderTapEffects();
   renderInterfaceSkins();
+  renderLiquidCoinVariants();
   renderMatch3();
   renderTetris();
 }
@@ -4343,6 +4439,12 @@ els.interfaceSkinGrid?.addEventListener("click", (event) => {
   setInterfaceSkin(button.dataset.interfaceSkinSelect);
 });
 
+els.liquidCoinVariantRow?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-liquid-coin-variant]");
+  if (!button) return;
+  setLiquidCoinVariant(button.dataset.liquidCoinVariant);
+});
+
 els.effectsIntensityToggle?.addEventListener("click", (event) => {
   const button = event.target.closest("[data-effects-intensity]");
   if (!button) return;
@@ -4433,6 +4535,7 @@ setupMatch3DebugMode();
 scheduleNextDecayTick();
 initTelegramWebApp();
 fetchOwnedInterfaceSkins({ silent: true });
+initDebugBypassPanel();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
