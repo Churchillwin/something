@@ -1,4 +1,4 @@
-const CACHE_NAME = "anime-tap-clicker-v36";
+const CACHE_NAME = "anime-tap-clicker-v40";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -40,6 +40,21 @@ const STATIC_ASSETS = [
   "./assets/coin-backdrop-ruins.webp",
   "./assets/coin-backdrop-forge.webp",
   "./assets/anime-tap-icon-512.png",
+  "./assets/liquid/shell-teal.webp",
+  "./assets/liquid/shell-coral.webp",
+  "./assets/liquid/shell-gold.webp",
+  "./assets/liquid/shell-mint.webp",
+  "./assets/liquid/shell-violet.webp",
+  "./assets/liquid/shell-ice.webp",
+  "./assets/liquid/board-summer.webp",
+  "./assets/liquid/board-ruins.webp",
+  "./assets/liquid/board-abyss.webp",
+  "./assets/liquid/scene-summer.webp",
+  "./assets/liquid/scene-ruins.webp",
+  "./assets/liquid/scene-abyss.webp",
+  "./assets/liquid/scene-pool.webp",
+  "./assets/liquid/scene-archway.webp",
+  "./assets/liquid/scene-jellyfish.webp",
 ];
 
 self.addEventListener("install", (event) => {

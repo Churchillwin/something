@@ -513,9 +513,9 @@ const interfaceSkinProducts = {
 // Water-surface palettes for the coin overlay, included free with the
 // Liquid Core purchase (no extra charge - one product, three looks).
 const liquidCoinVariants = [
-  { id: "lagoon", title: "Лагуна", colors: ["#34e0c4", "#1fb7c9"] },
+  { id: "summer", title: "Лето", colors: ["#34e0c4", "#7fe0b8"] },
+  { id: "ruins", title: "Руины", colors: ["#8fb5c9", "#4c6f8c"] },
   { id: "abyss", title: "Пучина", colors: ["#2f7fd6", "#4c3fd1"] },
-  { id: "sunset", title: "Закат", colors: ["#ffd166", "#ff8a5b"] },
 ];
 
 const rewardMilestones = [
@@ -555,7 +555,7 @@ const defaultState = {
   interfaceSkin: "default",
   ownedInterfaceSkins: [],
   effectsIntensity: "full",
-  liquidCoinVariant: "lagoon",
+  liquidCoinVariant: "summer",
 };
 
 const els = {
@@ -589,6 +589,8 @@ const els = {
   interfaceSkinGrid: document.querySelector("#interfaceSkinGrid"),
   interfaceSkinSummary: document.querySelector("#interfaceSkinSummary"),
   liquidCoinVariantRow: document.querySelector("#liquidCoinVariantRow"),
+  liquidCoinFlash: document.querySelector(".liquid-coin-flash"),
+  liquidAmbientBubbles: document.querySelector("#liquidAmbientBubbles"),
   effectsIntensityToggle: document.querySelector("#effectsIntensityToggle"),
   companionOutfitSection: document.querySelector("#companionOutfitSection"),
   companionOutfitGrid: document.querySelector("#companionOutfitGrid"),
@@ -726,7 +728,7 @@ function loadState() {
       : "full";
     const liquidCoinVariant = liquidCoinVariants.some((variant) => variant.id === saved?.liquidCoinVariant)
       ? saved.liquidCoinVariant
-      : "lagoon";
+      : "summer";
 
     return {
       ...defaultState,
@@ -2803,7 +2805,27 @@ function playLiquidTapEffect(buttonRect, tapX, tapY, clientX, clientY) {
     );
   }
 
+  // Everything past this point is pooled/capped particle-style feedback
+  // (flash, ripple, bubbles) - all routed through the same canSpawn() gate
+  // so a hidden tab, "off" intensity, or hitting LIQUID_MAX_ACTIVE_EFFECTS
+  // stops all of them together, the same way match3 caps its particles.
   if (!EffectsManager.canSpawn() || !els.tapFeedback) return;
+
+  if (els.liquidCoinFlash) {
+    const flashX = 50 + dx * 34;
+    const flashY = 50 + dy * 34;
+    const flashFinished = animateNode(
+      els.liquidCoinFlash,
+      [
+        { background: `radial-gradient(circle at ${flashX}% ${flashY}%, rgba(255,255,255,0.9), rgba(255,255,255,0.2) 22%, transparent 46%)`, opacity: 0 },
+        { opacity: 0.9, offset: 0.3 },
+        { opacity: 0 },
+      ],
+      { duration: EffectsManager.simplified() ? 260 : 420, easing: "ease-out" },
+    );
+    EffectsManager.track(flashFinished);
+  }
+
   const ripple = document.createElement("span");
   ripple.className = "liquid-ripple";
   ripple.style.setProperty("--x", `${tapX}px`);
@@ -2822,6 +2844,63 @@ function playLiquidTapEffect(buttonRect, tapX, tapY, clientX, clientY) {
   // with the WAAPI duration so the ripple doesn't sit visible after cancel.
   spawnFeedbackNode(els.tapFeedback, ripple, rippleDuration + 60);
   EffectsManager.track(finished);
+
+  const bubbleCount = EffectsManager.simplified() ? 2 : 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < bubbleCount; i += 1) {
+    spawnLiquidBubble(els.tapFeedback, tapX + (Math.random() - 0.5) * 18, {
+      startY: tapY,
+      size: 3 + Math.random() * 4,
+      riseHeight: 50 + Math.random() * 40,
+      duration: 650 + Math.random() * 400,
+      peakOpacity: 0.85,
+    });
+  }
+}
+
+// Shared bubble spawner for both the tap-point burst above and the ambient
+// background bubbles below - always routed through EffectsManager so the
+// same hard cap (LIQUID_MAX_ACTIVE_EFFECTS) covers ripples/flash/bubbles
+// together, not per-effect-type.
+function spawnLiquidBubble(container, x, opts = {}) {
+  if (!container) return;
+  const bubble = document.createElement("span");
+  bubble.className = "liquid-bubble";
+  const size = opts.size ?? 4 + Math.random() * 6;
+  bubble.style.setProperty("--x", `${x}px`);
+  bubble.style.setProperty("--size", `${size}px`);
+  if (typeof opts.startY === "number") {
+    bubble.style.bottom = "auto";
+    bubble.style.top = `${opts.startY}px`;
+  }
+  const riseHeight = opts.riseHeight ?? (container.clientHeight || 300) * (0.55 + Math.random() * 0.35);
+  const duration = opts.duration ?? 1800 + Math.random() * 1400;
+  const wobble = (Math.random() - 0.5) * 22;
+  const finished = animateNode(
+    bubble,
+    [
+      { transform: "translate(0, 0) scale(0.4)", opacity: 0 },
+      { transform: `translate(${wobble * 0.4}px, ${-riseHeight * 0.4}px) scale(1)`, opacity: opts.peakOpacity ?? 0.75, offset: 0.3 },
+      { transform: `translate(${wobble}px, ${-riseHeight}px) scale(0.85)`, opacity: 0 },
+    ],
+    { duration, easing: "ease-out" },
+  );
+  spawnFeedbackNode(container, bubble, duration + 80);
+  EffectsManager.track(finished);
+}
+
+const LIQUID_AMBIENT_BUBBLE_INTERVAL = { full: 1500, simplified: 2800 };
+let ambientBubbleTimer = null;
+
+function scheduleAmbientBubbles() {
+  window.clearTimeout(ambientBubbleTimer);
+  const interval = EffectsManager.simplified() ? LIQUID_AMBIENT_BUBBLE_INTERVAL.simplified : LIQUID_AMBIENT_BUBBLE_INTERVAL.full;
+  ambientBubbleTimer = window.setTimeout(() => {
+    if (EffectsManager.canSpawn() && els.liquidAmbientBubbles) {
+      const zoneWidth = els.tapZone?.clientWidth || 300;
+      spawnLiquidBubble(els.liquidAmbientBubbles, 12 + Math.random() * Math.max(1, zoneWidth - 24));
+    }
+    scheduleAmbientBubbles();
+  }, interval);
 }
 
 function pulseCompanion(x, y) {
@@ -3463,7 +3542,7 @@ function renderInterfaceSkins() {
           ? "покупка..."
           : owned
             ? active
-              ? "выбрано"
+              ? "выключить"
               : "применить"
             : `<button class="skin-buy-stars" type="button" data-interface-skin-buy="${product.id}">⭐ ${product.starsPrice}</button>`;
         return `
@@ -3818,6 +3897,13 @@ function renderTapEffects() {
   );
 }
 
+// Liquid Core reskins match3 gems as real seashell art instead of crystals.
+// File names mirror gemTypes ids 1:1 (assets/liquid/shell-teal.webp etc.)
+// so no separate mapping table is needed.
+function liquidShellImage(gemId) {
+  return `url('assets/liquid/shell-${gemId}.webp')`;
+}
+
 function renderMatch3() {
   const unlocked = isMatch3Unlocked();
   const chestPercent = Math.min(100, (state.match3Energy / CHEST_COST) * 100);
@@ -3925,7 +4011,9 @@ function renderMatch3() {
       const bomb = getBombType(cell.bombType);
       const pixelStyles = `--pixel-a: ${gem.pixels[0]}; --pixel-b: ${gem.pixels[1]}; --pixel-c: ${gem.pixels[2]};`;
       const bombStyles = bomb ? `--bomb-a: ${bomb.colors[0]}; --bomb-b: ${bomb.colors[1]}; --bomb-image: url('${bomb.image}');` : "";
-      const crystalStyles = !bomb ? `--gem-image: url('${gem.image}');` : "";
+      const crystalStyles = !bomb
+        ? `--gem-image: ${EffectsManager.isLiquid() ? liquidShellImage(gem.id) : `url('${gem.image}')`};`
+        : "";
       const fullGemStyles = [gemStyles, pixelStyles, bombStyles, crystalStyles].filter(Boolean).join(" ");
       return `
         <button
@@ -4436,7 +4524,10 @@ els.interfaceSkinGrid?.addEventListener("click", (event) => {
   }
   const button = event.target.closest("[data-interface-skin-select]");
   if (!button) return;
-  setInterfaceSkin(button.dataset.interfaceSkinSelect);
+  const themeId = button.dataset.interfaceSkinSelect;
+  // Clicking the already-active theme is the "off" switch: back to Default.
+  // Owned themes stay owned either way - this only changes what's applied.
+  setInterfaceSkin(getActiveThemeId() === themeId ? "default" : themeId);
 });
 
 els.liquidCoinVariantRow?.addEventListener("click", (event) => {
@@ -4533,6 +4624,7 @@ applyInterfaceSkin();
 render();
 setupMatch3DebugMode();
 scheduleNextDecayTick();
+scheduleAmbientBubbles();
 initTelegramWebApp();
 fetchOwnedInterfaceSkins({ silent: true });
 initDebugBypassPanel();

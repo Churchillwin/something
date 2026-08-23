@@ -48,12 +48,21 @@
         </div>
 
         <div class="tap-zone">
+          <div class="liquid-scene" aria-hidden="true">
+            <span class="liquid-scene-floor"></span>
+            <span class="liquid-scene-rocks"></span>
+            <span class="liquid-scene-rays"></span>
+            <span class="liquid-scene-caustics"></span>
+            <span class="liquid-scene-current"></span>
+            <span class="liquid-scene-bubbles" id="liquidAmbientBubbles"></span>
+          </div>
           <div class="coin-backdrop" id="coinBackdrop" hidden aria-hidden="true"></div>
           <div class="aura aura-one"></div>
           <div class="aura aura-two"></div>
           <button class="tap-button skin-crystal" id="tapButton" type="button" aria-label="Тапнуть">
             <img src="assets/anime-tap-core.webp" alt="" />
             <span class="liquid-coin-overlay" aria-hidden="true"></span>
+            <span class="liquid-coin-flash" aria-hidden="true"></span>
             <span class="tap-gloss"></span>
           </button>
           <div class="tap-feedback" id="tapFeedback" aria-hidden="true"></div>
