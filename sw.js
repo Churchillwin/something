@@ -1,4 +1,4 @@
-const CACHE_NAME = "anime-tap-clicker-v41";
+const CACHE_NAME = "anime-tap-clicker-v42";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -40,6 +40,7 @@ const STATIC_ASSETS = [
   "./assets/coin-backdrop-ruins.webp",
   "./assets/coin-backdrop-forge.webp",
   "./assets/anime-tap-icon-512.png",
+  "./assets/liquid/coin-medallion.webp",
   "./assets/liquid/shell-teal.webp",
   "./assets/liquid/shell-coral.webp",
   "./assets/liquid/shell-gold.webp",
