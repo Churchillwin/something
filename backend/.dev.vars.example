@@ -1,0 +1,16 @@
+# Local-dev-only secrets for `wrangler dev` (Cloudflare's convention: a
+# .dev.vars file, gitignored, never committed). Copy this to `.dev.vars` and
+# fill in real values for local testing only.
+#
+# In production these are NOT set as files — use:
+#   wrangler secret put BOT_TOKEN
+#   wrangler secret put WEBHOOK_SECRET
+# which stores them encrypted on Cloudflare's side, never in the repo.
+
+# Token from @BotFather. Never commit this, never put it in frontend code.
+BOT_TOKEN=
+
+# Any random string you generate yourself (e.g. `openssl rand -hex 32`).
+# Passed to Telegram's setWebhook as secret_token, and checked against the
+# X-Telegram-Bot-Api-Secret-Token header on every incoming webhook call.
+WEBHOOK_SECRET=

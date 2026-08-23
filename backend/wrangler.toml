@@ -1,0 +1,19 @@
+name = "anime-tap-clicker-stars"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Fill in database_id after running:
+#   wrangler d1 create anime-tap-clicker-db
+[[d1_databases]]
+binding = "DB"
+database_name = "anime-tap-clicker-db"
+database_id = "4e1a51cd-b330-4dae-a33a-814937cf8bf9"
+
+[vars]
+# Origin the Mini App is served from — used only for the CORS response
+# header, safe to keep as a plain (non-secret) var.
+ALLOWED_ORIGIN = "https://churchillwin.github.io"
+
+# Secrets (BOT_TOKEN, WEBHOOK_SECRET) are NOT set here — set them with:
+#   wrangler secret put BOT_TOKEN
+#   wrangler secret put WEBHOOK_SECRET

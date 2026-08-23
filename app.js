@@ -490,6 +490,26 @@ const tapEffects = [
   },
 ];
 
+// Interface-wide cosmetic themes (whole-UI motion language), distinct from
+// the tap-coin `skins` above. Adding a new theme means: one entry here, one
+// entry in interfaceSkinProducts if it's purchasable, and a
+// [data-interface-skin="id"] CSS block - no copies of game screens.
+const themeRegistry = {
+  default: { id: "default", label: "Обычная" },
+  liquid: { id: "liquid", label: "Liquid Core" },
+};
+
+const interfaceSkinProducts = {
+  interface_skin_liquid_v1: {
+    id: "interface_skin_liquid_v1",
+    themeId: "liquid",
+    title: "Живое ядро",
+    subtitle: "Liquid Core",
+    description: "Желейная деформация ядра, лёгкая рябь от тапа и жидкая шкала прогресса. Чисто косметика — на силу тапа и награды не влияет.",
+    starsPrice: 199,
+  },
+};
+
 const rewardMilestones = [
     ...new Set([
       ...achievements.map((achievement) => achievement.threshold),
@@ -524,6 +544,9 @@ const defaultState = {
   activeCompanionOutfit: "base",
   match3EverUnlocked: false,
   tetrisEverUnlocked: false,
+  interfaceSkin: "default",
+  ownedInterfaceSkins: [],
+  effectsIntensity: "full",
 };
 
 const els = {
@@ -554,6 +577,9 @@ const els = {
   backdropSummary: document.querySelector("#backdropSummary"),
   tapEffectGrid: document.querySelector("#tapEffectGrid"),
   tapEffectSummary: document.querySelector("#tapEffectSummary"),
+  interfaceSkinGrid: document.querySelector("#interfaceSkinGrid"),
+  interfaceSkinSummary: document.querySelector("#interfaceSkinSummary"),
+  effectsIntensityToggle: document.querySelector("#effectsIntensityToggle"),
   companionOutfitSection: document.querySelector("#companionOutfitSection"),
   companionOutfitGrid: document.querySelector("#companionOutfitGrid"),
   companionOutfitSummary: document.querySelector("#companionOutfitSummary"),
@@ -677,6 +703,17 @@ function loadState() {
     const activeCompanionOutfit = unlockedCompanionOutfits.includes(saved?.activeCompanionOutfit)
       ? saved.activeCompanionOutfit
       : "base";
+    const savedOwnedInterfaceSkins = Array.isArray(saved?.ownedInterfaceSkins) ? saved.ownedInterfaceSkins : [];
+    const ownedInterfaceSkins = [
+      ...new Set(savedOwnedInterfaceSkins.filter((id) => Boolean(themeRegistry[id]) && id !== "default")),
+    ];
+    const interfaceSkin =
+      saved?.interfaceSkin === "default" || ownedInterfaceSkins.includes(saved?.interfaceSkin)
+        ? saved.interfaceSkin
+        : "default";
+    const effectsIntensity = ["full", "simplified", "off"].includes(saved?.effectsIntensity)
+      ? saved.effectsIntensity
+      : "full";
 
     return {
       ...defaultState,
@@ -700,6 +737,9 @@ function loadState() {
       activeCompanionOutfit,
       match3EverUnlocked: Boolean(saved?.match3EverUnlocked) || taps >= MATCH3_UNLOCK_THRESHOLD,
       tetrisEverUnlocked: Boolean(saved?.tetrisEverUnlocked) || taps >= TETRIS_UNLOCK_THRESHOLD,
+      ownedInterfaceSkins,
+      interfaceSkin,
+      effectsIntensity,
       combo: 1,
       lastTapAt: 0,
     };
@@ -2705,6 +2745,7 @@ function handleTap(event) {
   saveState();
   render();
   pulseTapButton();
+  playLiquidTapEffect(rect, tapX, tapY, x, y);
   pulseCompanion(tapX, tapY);
   telegramHaptic("light");
 }
@@ -2714,6 +2755,59 @@ function pulseTapButton() {
   void els.tapButton.offsetWidth;
   els.tapButton.classList.add("is-tapping");
   window.setTimeout(() => els.tapButton.classList.remove("is-tapping"), 530);
+}
+
+// Liquid Core tap reaction: a direction-biased jelly squish on the coin
+// image (transform-only, composes independently of .is-tapping above since
+// it targets the child <img>, not the button) plus a ripple from the touch
+// point. Pure cosmetic feedback - runs after scoring/render, never before,
+// and every early-return here still leaves the tap fully processed.
+function playLiquidTapEffect(buttonRect, tapX, tapY, clientX, clientY) {
+  if (!EffectsManager.isLiquid()) return;
+
+  const cx = buttonRect.left + buttonRect.width / 2;
+  const cy = buttonRect.top + buttonRect.height / 2;
+  const dx = Math.max(-1, Math.min(1, ((clientX ?? cx) - cx) / (buttonRect.width / 2 || 1)));
+  const dy = Math.max(-1, Math.min(1, ((clientY ?? cy) - cy) / (buttonRect.height / 2 || 1)));
+
+  if (els.tapImage) {
+    const squish = EffectsManager.simplified() ? 0.05 : 0.1;
+    const stretch = EffectsManager.simplified() ? 0.025 : 0.05;
+    animateNode(
+      els.tapImage,
+      [
+        { transform: "scale3d(1, 1, 1)", offset: 0 },
+        {
+          transform: `scale3d(${1 - squish * Math.abs(dx) + stretch * Math.abs(dy)}, ${1 - squish * Math.abs(dy) + stretch * Math.abs(dx)}, 1) translate3d(${dx * 2}px, ${dy * 2}px, 0)`,
+          offset: 0.32,
+        },
+        { transform: `scale3d(${1 + stretch}, ${1 + stretch}, 1) translate3d(${-dx * 1}px, ${-dy * 1}px, 0)`, offset: 0.58 },
+        { transform: "scale3d(0.99, 0.99, 1)", offset: 0.8 },
+        { transform: "scale3d(1, 1, 1)", offset: 1 },
+      ],
+      { duration: 360, easing: "cubic-bezier(0.33, 1, 0.4, 1)" },
+    );
+  }
+
+  if (!EffectsManager.canSpawn() || !els.tapFeedback) return;
+  const ripple = document.createElement("span");
+  ripple.className = "liquid-ripple";
+  ripple.style.setProperty("--x", `${tapX}px`);
+  ripple.style.setProperty("--y", `${tapY}px`);
+  const rippleDuration = EffectsManager.simplified() ? 260 : 420;
+  const finished = animateNode(
+    ripple,
+    [
+      { transform: "translate(-50%, -50%) scale(0.15)", opacity: 0.55 },
+      { transform: "translate(-50%, -50%) scale(1)", opacity: 0 },
+    ],
+    { duration: rippleDuration, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+  );
+  // Element.animate() never fires `animationend`, so spawnFeedbackNode's
+  // cleanup here is really just its fallback timer - keep it in lockstep
+  // with the WAAPI duration so the ripple doesn't sit visible after cancel.
+  spawnFeedbackNode(els.tapFeedback, ripple, rippleDuration + 60);
+  EffectsManager.track(finished);
 }
 
 function pulseCompanion(x, y) {
@@ -3222,7 +3316,131 @@ function showToast(title, detail) {
   telegramHaptic("success");
 }
 
+// --- Theme system -----------------------------------------------------
+// Interface-wide cosmetic themes are purely visual: they never touch tap
+// power, drop rates, or progress math. Adding a theme = one themeRegistry
+// entry + a [data-interface-skin="id"] CSS block; every screen keeps
+// rendering exactly as it does today, they just read a different skin.
+
+const LIQUID_MAX_ACTIVE_EFFECTS = 24;
+let activeLiquidEffects = 0;
+
+function getActiveThemeId() {
+  return themeRegistry[state.interfaceSkin] ? state.interfaceSkin : "default";
+}
+
+function isThemeOwned(themeId) {
+  return themeId === "default" || state.ownedInterfaceSkins.includes(themeId);
+}
+
+function setInterfaceSkin(themeId) {
+  if (!themeRegistry[themeId] || !isThemeOwned(themeId)) return false;
+  if (state.interfaceSkin === themeId) return true;
+  state.interfaceSkin = themeId;
+  saveState();
+  applyInterfaceSkin();
+  render();
+  telegramHaptic("light");
+  return true;
+}
+
+function applyInterfaceSkin() {
+  const themeId = getActiveThemeId();
+  if (document.body.dataset.interfaceSkin !== themeId) {
+    document.body.dataset.interfaceSkin = themeId;
+  }
+  const effectiveIntensity = isReducedMotion() ? "simplified" : state.effectsIntensity;
+  if (document.body.dataset.effects !== effectiveIntensity) {
+    document.body.dataset.effects = effectiveIntensity;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  document.body.classList.toggle("is-hidden-tab", document.hidden);
+});
+
+// Centralizes "should a Liquid effect run right now" so every effect spawn
+// site (coin squish, ripple, button press, progress shimmer) answers the
+// question the same way instead of re-checking motion/visibility/cap logic.
+const EffectsManager = {
+  isLiquid() {
+    return getActiveThemeId() === "liquid";
+  },
+  intensity() {
+    if (isReducedMotion()) return "simplified";
+    return state.effectsIntensity;
+  },
+  canSpawn() {
+    if (!this.isLiquid() || document.hidden) return false;
+    const level = this.intensity();
+    if (level === "off") return false;
+    return activeLiquidEffects < LIQUID_MAX_ACTIVE_EFFECTS;
+  },
+  simplified() {
+    return this.intensity() === "simplified";
+  },
+  track(finished) {
+    activeLiquidEffects += 1;
+    const release = () => {
+      activeLiquidEffects = Math.max(0, activeLiquidEffects - 1);
+    };
+    Promise.resolve(finished).then(release, release);
+  },
+};
+
+function setEffectsIntensity(level) {
+  if (!["full", "simplified", "off"].includes(level) || state.effectsIntensity === level) return;
+  state.effectsIntensity = level;
+  saveState();
+  render();
+}
+
+function renderInterfaceSkins() {
+  if (!els.interfaceSkinGrid) return;
+  const products = Object.values(interfaceSkinProducts);
+  const ownedCount = products.filter((product) => state.ownedInterfaceSkins.includes(product.themeId)).length;
+  if (els.interfaceSkinSummary) els.interfaceSkinSummary.textContent = `${ownedCount}/${products.length}`;
+
+  setHTMLIfChanged(
+    els.interfaceSkinGrid,
+    products
+      .map((product) => {
+        const owned = isThemeOwned(product.themeId);
+        const active = getActiveThemeId() === product.themeId;
+        const purchasing = interfaceSkinPurchaseState.productId === product.id;
+        const canBuy = !owned && !purchasing;
+        const tag = owned ? "button" : "div";
+        const interactiveAttrs = owned ? `type="button"` : "";
+        const stateContent = purchasing
+          ? "покупка..."
+          : owned
+            ? active
+              ? "выбрано"
+              : "применить"
+            : `<button class="skin-buy-stars" type="button" data-interface-skin-buy="${product.id}">⭐ ${product.starsPrice}</button>`;
+        return `
+          <${tag} class="skin-option interface-skin-option ${owned ? "is-unlocked" : "is-locked"} ${active ? "is-active" : ""} ${canBuy ? "has-stars-buy" : ""}" data-interface-skin-select="${product.themeId}" ${interactiveAttrs} title="${product.description}">
+            <span class="skin-preview interface-skin-preview interface-skin-preview-${product.themeId}">
+              <span class="interface-skin-preview-glyph" aria-hidden="true"></span>
+            </span>
+            <strong>${product.title}</strong>
+            <span class="skin-state">${stateContent}</span>
+          </${tag}>
+        `;
+      })
+      .join(""),
+  );
+
+  if (els.effectsIntensityToggle) {
+    els.effectsIntensityToggle.querySelectorAll("[data-effects-intensity]").forEach((button) => {
+      const isActive = button.dataset.effectsIntensity === state.effectsIntensity;
+      button.classList.toggle("is-active", isActive);
+    });
+  }
+}
+
 function render() {
+  applyInterfaceSkin();
   const activeSkin = getActiveSkin();
   const nextReward = rewardMilestones.find((threshold) => threshold > state.taps);
 
@@ -3247,6 +3465,7 @@ function render() {
   renderCompanionOutfits();
   renderBackdrops();
   renderTapEffects();
+  renderInterfaceSkins();
   renderMatch3();
   renderTetris();
 }
@@ -3975,8 +4194,13 @@ function initTelegramWebApp() {
 
 // Telegram Stars checkout needs a server: only a bot-token-holding backend can
 // call Bot API `createInvoiceLink` (currency "XTR") and verify `initData`.
-// Point this at that endpoint once it exists; POST { skinId, initData } and
-// expect JSON back as { invoiceUrl }.
+// Point this at that backend once it's deployed (see backend/) — empty means
+// "not connected yet", and every purchase path below reports that honestly
+// instead of pretending to succeed.
+const BACKEND_BASE_URL = "https://anime-tap-clicker-stars.churchillwin.workers.dev";
+
+// Legacy single-endpoint constant kept for the existing mint-skin example
+// purchase; new code should prefer BACKEND_BASE_URL + a route.
 const TELEGRAM_INVOICE_ENDPOINT = "";
 
 async function purchaseSkinWithStars(skinId) {
@@ -4013,6 +4237,84 @@ async function purchaseSkinWithStars(skinId) {
   }
 }
 
+// --- Interface-skin entitlements (server is the source of truth) ------
+// localStorage is a cache only. Ownership is only ever written here from a
+// server response, never from the Telegram openInvoice callback directly —
+// a "paid" callback tells us the *client* saw a payment sheet close, not
+// that Telegram confirmed a successful_payment to our backend. So on "paid"
+// we re-ask the server what it thinks we own, same as on every cold start.
+let interfaceSkinPurchaseState = { productId: null };
+
+async function fetchOwnedInterfaceSkins({ silent = false } = {}) {
+  const tg = window.Telegram?.WebApp;
+  if (!BACKEND_BASE_URL || !tg?.initData) return;
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/me/skins`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData: tg.initData }),
+    });
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const data = await response.json();
+    const owned = Array.isArray(data?.ownedThemeIds) ? data.ownedThemeIds : [];
+    state.ownedInterfaceSkins = [...new Set(owned.filter((id) => Boolean(themeRegistry[id]) && id !== "default"))];
+    if (!isThemeOwned(state.interfaceSkin)) state.interfaceSkin = "default";
+    saveState();
+    render();
+  } catch {
+    if (!silent) showToast("Не удалось обновить", "Проверь подключение и попробуй ещё раз");
+  }
+}
+
+async function purchaseInterfaceSkin(productId) {
+  const product = interfaceSkinProducts[productId];
+  if (!product || isThemeOwned(product.themeId) || interfaceSkinPurchaseState.productId) return;
+
+  const tg = window.Telegram?.WebApp;
+  if (!tg?.openInvoice) {
+    showToast("Доступно в Telegram", "Открой игру внутри Telegram, чтобы платить звёздами");
+    return;
+  }
+  if (!BACKEND_BASE_URL) {
+    showToast("Магазин в разработке", `Нужен бэкенд, который выставит счёт на ${product.starsPrice}⭐`);
+    return;
+  }
+
+  interfaceSkinPurchaseState = { productId };
+  render();
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId, initData: tg.initData }),
+    });
+    if (!response.ok) throw new Error(`status ${response.status}`);
+    const data = await response.json();
+    if (!data?.invoiceUrl) throw new Error("no invoice url");
+
+    tg.openInvoice(data.invoiceUrl, async (status) => {
+      interfaceSkinPurchaseState = { productId: null };
+      if (status === "paid") {
+        await fetchOwnedInterfaceSkins();
+        if (isThemeOwned(product.themeId)) {
+          showToast("Готово", `${product.title} куплено`);
+        } else {
+          showToast("Оплата обрабатывается", "Подтверждение придёт через пару секунд, попробуй обновить");
+        }
+      } else if (status === "failed") {
+        showToast("Платёж не прошёл", "Звёзды не списаны, попробуй ещё раз");
+      } else if (status === "cancelled") {
+        showToast("Покупка отменена", "Звёзды не списаны");
+      }
+      render();
+    });
+  } catch {
+    interfaceSkinPurchaseState = { productId: null };
+    showToast("Не получилось", "Магазин временно недоступен");
+    render();
+  }
+}
+
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => switchTab(tab.dataset.tab));
 });
@@ -4028,6 +4330,23 @@ els.skinGrid.addEventListener("click", (event) => {
   state.activeSkin = button.dataset.skin;
   saveState();
   render();
+});
+
+els.interfaceSkinGrid?.addEventListener("click", (event) => {
+  const buyButton = event.target.closest("[data-interface-skin-buy]");
+  if (buyButton) {
+    purchaseInterfaceSkin(buyButton.dataset.interfaceSkinBuy);
+    return;
+  }
+  const button = event.target.closest("[data-interface-skin-select]");
+  if (!button) return;
+  setInterfaceSkin(button.dataset.interfaceSkinSelect);
+});
+
+els.effectsIntensityToggle?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-effects-intensity]");
+  if (!button) return;
+  setEffectsIntensity(button.dataset.effectsIntensity);
 });
 
 els.companionOutfitGrid?.addEventListener("click", (event) => {
@@ -4108,10 +4427,12 @@ window.addEventListener("keyup", (event) => {
 
 checkUnlocks({ silent: true });
 saveState();
+applyInterfaceSkin();
 render();
 setupMatch3DebugMode();
 scheduleNextDecayTick();
 initTelegramWebApp();
+fetchOwnedInterfaceSkins({ silent: true });
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

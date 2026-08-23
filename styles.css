@@ -1698,6 +1698,21 @@ h2 {
   animation: focusDot 780ms ease-out forwards;
 }
 
+.liquid-ripple {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 64px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--liquid-a, #34e0c4) 80%, white 12%);
+  box-shadow:
+    0 0 20px color-mix(in srgb, var(--liquid-a, #34e0c4) 55%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--liquid-b, #2f7fd6) 45%, transparent);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.15);
+}
+
 .progress-card {
   align-items: stretch;
   flex-direction: column;
@@ -2311,6 +2326,61 @@ body.is-match3-focus .chest-panel {
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 900;
+}
+
+/* Interface-wide themes (Скины > Интерфейс). Card chrome is shared with
+   .skin-option; only the preview glyph and colors are theme-specific. */
+.interface-skin-preview {
+  display: grid;
+  place-items: center;
+  --accent-a: #6ee7d8;
+  --accent-b: #3b82c4;
+}
+
+.interface-skin-preview-glyph::before {
+  content: "◐";
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.interface-skin-preview-liquid {
+  --accent-a: #34e0c4;
+  --accent-b: #2f7fd6;
+}
+
+.interface-skin-preview-liquid .interface-skin-preview-glyph::before {
+  content: "💧";
+  font-size: 1rem;
+}
+
+.effects-intensity {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.effects-intensity-option {
+  flex: 1;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 6px 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.effects-intensity-option:active {
+  transform: translateY(1px);
+}
+
+.effects-intensity-option.is-active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--theme-b) 82%, white 10%);
+  background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 60%, var(--coral)));
 }
 
 .companion-outfit-grid {
@@ -4982,5 +5052,160 @@ body.is-match3-focus .chest-panel {
     width: min(100%, 82vw);
     gap: 5px;
     padding: 7px;
+  }
+}
+
+/* ==========================================================================
+   Liquid Core interface theme ([data-interface-skin="liquid"] on <body>)
+   Purely cosmetic: colors/motion only, never layout, size, or copy — so it
+   can never misrepresent taps, progress, or rewards. DefaultTheme (no
+   attribute, or ="default") is completely unaffected by anything below.
+   Visual effects (jelly squish, ripple, liquid progress fill) land here in
+   a later stage; this block currently only carries the palette tokens.
+   ========================================================================== */
+[data-interface-skin="liquid"] {
+  --liquid-a: #34e0c4;
+  --liquid-b: #2f7fd6;
+  --liquid-c: #10b981;
+  --liquid-gold: #ffd166;
+}
+
+/* The default coin-press keyframe also targets img { transform }; Liquid
+   drives that same property from JS (playLiquidTapEffect via animateNode),
+   so the CSS one is switched off to avoid two engines fighting over one
+   property on the same tap. */
+[data-interface-skin="liquid"] .tap-button.is-tapping img {
+  animation: none;
+}
+
+[data-interface-skin="liquid"] .tap-button {
+  animation: liquidBreathe 3400ms ease-in-out infinite;
+}
+
+[data-interface-skin="liquid"] .tap-button::before {
+  background:
+    radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.5), transparent 40%),
+    conic-gradient(from 0deg, transparent, var(--liquid-a), transparent 30%, var(--liquid-gold), transparent 60%, var(--liquid-b), transparent);
+  opacity: 0.4;
+  transform: scale(1) rotate(0deg);
+  animation: liquidEdgeShimmer 7000ms linear infinite;
+}
+
+[data-interface-skin="liquid"][data-effects="off"] .tap-button,
+[data-interface-skin="liquid"][data-effects="off"] .tap-button::before,
+body.is-hidden-tab[data-interface-skin="liquid"] .tap-button,
+body.is-hidden-tab[data-interface-skin="liquid"] .tap-button::before {
+  animation-play-state: paused;
+}
+
+[data-interface-skin="liquid"][data-effects="simplified"] .tap-button {
+  animation-duration: 5200ms;
+}
+
+[data-interface-skin="liquid"][data-effects="simplified"] .tap-button::before {
+  animation-duration: 9000ms;
+  opacity: 0.26;
+}
+
+@keyframes liquidBreathe {
+  0%,
+  100% {
+    filter: brightness(1) saturate(1.04);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.05) saturate(1.16);
+    transform: scale(1.012);
+  }
+}
+
+@keyframes liquidEdgeShimmer {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+  }
+}
+
+/* Interactive buttons/cards/toggles get a light press-in + liquid highlight
+   under Liquid Core - explicitly not applied to plain text or decorative
+   panels, so this only targets elements already carrying an interactive
+   button/option class. */
+[data-interface-skin="liquid"] .icon-button,
+[data-interface-skin="liquid"] .tab,
+[data-interface-skin="liquid"] .skin-option:not(:disabled),
+[data-interface-skin="liquid"] .companion-outfit-option:not(:disabled),
+[data-interface-skin="liquid"] .cosmetic-option:not(:disabled),
+[data-interface-skin="liquid"] .effects-intensity-option,
+[data-interface-skin="liquid"] .skin-buy-stars,
+[data-interface-skin="liquid"] .chest-button {
+  transition: transform 140ms cubic-bezier(0.33, 1, 0.4, 1), box-shadow 140ms ease, filter 140ms ease;
+}
+
+[data-interface-skin="liquid"] .icon-button:active,
+[data-interface-skin="liquid"] .tab:active,
+[data-interface-skin="liquid"] .skin-option:not(:disabled):active,
+[data-interface-skin="liquid"] .companion-outfit-option:not(:disabled):active,
+[data-interface-skin="liquid"] .cosmetic-option:not(:disabled):active,
+[data-interface-skin="liquid"] .effects-intensity-option:active,
+[data-interface-skin="liquid"] .skin-buy-stars:active,
+[data-interface-skin="liquid"] .chest-button:active {
+  transform: translateY(1px) scale(0.972);
+  filter: brightness(1.08) saturate(1.1);
+}
+
+/* Liquid progress-bar fill: glowing liquid with subtle surface motion.
+   Width still comes from JS (#rewardProgress.style.width) - this only
+   restyles the fill's paint, never the number it represents. */
+[data-interface-skin="liquid"] #rewardProgress {
+  background:
+    linear-gradient(90deg, var(--liquid-c), var(--liquid-a) 55%, var(--liquid-gold));
+  background-size: 220% 100%;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--liquid-a) 55%, transparent);
+  animation: liquidProgressFlow 3200ms linear infinite;
+}
+
+[data-interface-skin="liquid"][data-effects="off"] #rewardProgress,
+body.is-hidden-tab[data-interface-skin="liquid"] #rewardProgress {
+  animation-play-state: paused;
+}
+
+@keyframes liquidProgressFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: -220% 50%;
+  }
+}
+
+/* Reward sparks become jelly droplets: same --distance/--rotate custom
+   props and the same 0%-to-var(--distance) flight path as sparkFly, so the
+   trajectory (and everything that spawns/positions it in JS) is untouched -
+   only the scale/opacity keyframe values are re-timed for a stretch, wobble,
+   settle read instead of a uniform grow/shrink. */
+[data-interface-skin="liquid"] .spark {
+  animation-name: liquidSparkDroplet;
+}
+
+@keyframes liquidSparkDroplet {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--rotate)) translateX(0) scale(0.7, 0.7);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--rotate)) translateX(calc(var(--distance) * 0.4)) scale(1.28, 0.82);
+  }
+  55% {
+    transform: translate(-50%, -50%) rotate(var(--rotate)) translateX(calc(var(--distance) * 0.68)) scale(0.86, 1.16);
+  }
+  78% {
+    transform: translate(-50%, -50%) rotate(var(--rotate)) translateX(calc(var(--distance) * 0.88)) scale(1.06, 0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rotate)) translateX(var(--distance)) scale(0.2, 0.2);
   }
 }
