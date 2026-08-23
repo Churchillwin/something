@@ -136,6 +136,11 @@
             <span id="cardSummary">0/0</span>
           </div>
           <div class="card-grid" id="cardGrid"></div>
+          <button class="dev-key-card" id="devKeyCard" type="button" title="Тестовый ключ — не часть игры, только для проверки на своих устройствах">
+            <span class="dev-key-glyph" aria-hidden="true">🔑</span>
+            <strong>Тестовый ключ</strong>
+            <span>Открыть всё платное локально для проверки</span>
+          </button>
         </section>
 
         <section class="tab-panel" id="skinsPanel" data-panel="skins" aria-label="Скины">
@@ -202,6 +207,18 @@
               <div>
                 <span class="label">Сундуки</span>
                 <strong id="chestCount">0</strong>
+              </div>
+            </div>
+
+            <div class="chest-panel match3-level-panel">
+              <div class="chest-topline">
+                <div>
+                  <span class="label">Уровень</span>
+                  <strong id="match3LevelStatus">1/75</strong>
+                </div>
+              </div>
+              <div class="progress-track" aria-hidden="true">
+                <span id="match3LevelProgress"></span>
               </div>
             </div>
 

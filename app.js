@@ -4,6 +4,24 @@ const MATCH3_UNLOCK_THRESHOLD = 100_000_000;
 const TETRIS_UNLOCK_THRESHOLD = 1_000_000_000;
 const BOARD_SIZE = 6;
 const CHEST_COST = 1_200;
+const MATCH3_LEVEL_COUNT = 75;
+
+// Cumulative lifetime match3 energy needed to have completed `level`.
+// Deliberately gentle/easy curve per the user's request - level 1 clears
+// in a couple of matches, and it scales up gradually from there rather
+// than spiking, since this is meant as a sense-of-progress layer on top
+// of the existing endless energy/chest loop, not a difficulty ramp.
+function match3LevelThreshold(level) {
+  return Math.round(60 * level ** 1.35);
+}
+
+function getMatch3Level() {
+  let level = 0;
+  while (level < MATCH3_LEVEL_COUNT && state.match3TotalEnergyEarned >= match3LevelThreshold(level + 1)) {
+    level += 1;
+  }
+  return level;
+}
 const COMPANION_DROP_CHANCE = 0.35;
 const COMPANION_PITY_CHESTS = 3;
 const COMPANION_SLEEP_DELAY = 22_000;
@@ -540,6 +558,7 @@ const defaultState = {
   maxToastShown: false,
   match3Board: [],
   match3Energy: 0,
+  match3TotalEnergyEarned: 0,
   chestsOpened: 0,
   companionUnlocked: false,
   activeCompanion: null,
@@ -579,6 +598,7 @@ const els = {
   achievementList: document.querySelector("#achievementList"),
   achievementSummary: document.querySelector("#achievementSummary"),
   cardGrid: document.querySelector("#cardGrid"),
+  devKeyCard: document.querySelector("#devKeyCard"),
   cardSummary: document.querySelector("#cardSummary"),
   skinGrid: document.querySelector("#skinGrid"),
   skinSummary: document.querySelector("#skinSummary"),
@@ -603,6 +623,8 @@ const els = {
   match3Game: document.querySelector("#match3Game"),
   match3Board: document.querySelector("#match3Board"),
   match3Energy: document.querySelector("#match3Energy"),
+  match3LevelStatus: document.querySelector("#match3LevelStatus"),
+  match3LevelProgress: document.querySelector("#match3LevelProgress"),
   tetrisTab: document.querySelector("#tetrisTab"),
   tetrisSummary: document.querySelector("#tetrisSummary"),
   tetrisLocked: document.querySelector("#tetrisLocked"),
@@ -740,6 +762,7 @@ function loadState() {
       unlockedSkins,
       match3Board,
       match3Energy: Math.max(0, Number(saved?.match3Energy ?? 0)),
+      match3TotalEnergyEarned: Math.max(0, Number(saved?.match3TotalEnergyEarned ?? 0)),
       chestsOpened: Math.max(0, Number(saved?.chestsOpened ?? 0)),
       companionUnlocked: Boolean(saved?.companionUnlocked),
       activeCompanion,
@@ -3247,7 +3270,16 @@ async function resolveMatch3(initialMatches, { directBombs = [], swapIndexes = [
 
     const destroyedBlockers = applyClearPlan(clearPlan, specialSpawns);
     const energyGain = (clearPlan.clearGems.size * 25 + destroyedBlockers * 75 + clearPlan.triggeredBombs.size * 120) * chain;
+    const levelBeforeGain = getMatch3Level();
     state.match3Energy += energyGain;
+    state.match3TotalEnergyEarned += energyGain;
+    const levelAfterGain = getMatch3Level();
+    if (levelAfterGain > levelBeforeGain) {
+      showToast(
+        "Уровень пройден",
+        levelAfterGain >= MATCH3_LEVEL_COUNT ? "Все 75 уровней позади!" : `Уровень ${levelAfterGain}/${MATCH3_LEVEL_COUNT}`,
+      );
+    }
     renderMatch3();
     await sleep(getMotionDuration(getClearHoldDuration(clearPlan)));
 
@@ -3575,6 +3607,33 @@ function renderInterfaceSkins() {
 // locally where there's no backend/initData to sync against.
 // Remove this whole block (and its call at the bottom of the file) once
 // visual QA on Liquid Core is done.
+// Shared by both local test-only entry points below (the ?debugSkins=1
+// panel and the in-game key card): unlocks every cosmetic/collectible
+// locally so appearance can be checked without paying. NOT a real
+// purchase bypass - inside real Telegram, fetchOwnedInterfaceSkins()
+// overwrites state.ownedInterfaceSkins from the server on every load, so
+// this can't fake server-side ownership, only preview looks locally where
+// there's no backend/initData to sync against.
+function debugGrantAllCosmetics() {
+  state.unlockedAchievements = achievements.map((item) => item.id);
+  state.unlockedCards = cards.map((item) => item.id);
+  state.unlockedSkins = skins.map((item) => item.id);
+  state.unlockedBackdrops = coinBackdrops.map((item) => item.id);
+  state.unlockedTapEffects = tapEffects.map((item) => item.id);
+  state.unlockedCompanionOutfits = companionOutfits.map((item) => item.id);
+  state.companionUnlocked = true;
+  state.ownedInterfaceSkins = Object.keys(themeRegistry).filter((id) => id !== "default");
+  state.match3EverUnlocked = true;
+  state.tetrisEverUnlocked = true;
+  saveState();
+  render();
+}
+
+function debugResetTestData() {
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
 function initDebugBypassPanel() {
   if (!new URLSearchParams(location.search).has("debugSkins")) return;
 
@@ -3593,23 +3652,40 @@ function initDebugBypassPanel() {
   panel.addEventListener("click", (event) => {
     const action = event.target.closest("[data-debug-action]")?.dataset.debugAction;
     if (action === "grant-all") {
-      state.unlockedAchievements = achievements.map((item) => item.id);
-      state.unlockedCards = cards.map((item) => item.id);
-      state.unlockedSkins = skins.map((item) => item.id);
-      state.unlockedBackdrops = coinBackdrops.map((item) => item.id);
-      state.unlockedTapEffects = tapEffects.map((item) => item.id);
-      state.unlockedCompanionOutfits = companionOutfits.map((item) => item.id);
-      state.companionUnlocked = true;
-      state.ownedInterfaceSkins = Object.keys(themeRegistry).filter((id) => id !== "default");
-      state.match3EverUnlocked = true;
-      state.tetrisEverUnlocked = true;
-      saveState();
-      render();
+      debugGrantAllCosmetics();
       showToast("Тест-режим", "Выдано всё для просмотра");
     } else if (action === "reset") {
-      localStorage.removeItem(STORAGE_KEY);
-      location.reload();
+      debugResetTestData();
     }
+  });
+}
+
+// In-game equivalent of the panel above, reachable on any device (phone
+// in real Telegram included) without a special URL - a small key tile at
+// the end of Карточки. Tap once to arm it (so it can't fire from a
+// stray tap while scrolling), tap again within a few seconds to confirm.
+let devKeyArmed = false;
+let devKeyArmTimer = null;
+
+function initDevKeyCard() {
+  if (!els.devKeyCard) return;
+  els.devKeyCard.addEventListener("click", () => {
+    if (!devKeyArmed) {
+      devKeyArmed = true;
+      els.devKeyCard.classList.add("is-armed");
+      showToast("Тестовый ключ", "Нажми ещё раз, чтобы выдать всё платное");
+      window.clearTimeout(devKeyArmTimer);
+      devKeyArmTimer = window.setTimeout(() => {
+        devKeyArmed = false;
+        els.devKeyCard.classList.remove("is-armed");
+      }, 4000);
+      return;
+    }
+    window.clearTimeout(devKeyArmTimer);
+    devKeyArmed = false;
+    els.devKeyCard.classList.remove("is-armed");
+    debugGrantAllCosmetics();
+    showToast("Тестовый ключ", "Всё платное открыто локально для проверки");
   });
 }
 
@@ -3935,6 +4011,15 @@ function renderMatch3() {
 
   els.match3Energy.textContent = formatShort(state.match3Energy);
   els.chestCount.textContent = formatShort(state.chestsOpened);
+  if (els.match3LevelStatus && els.match3LevelProgress) {
+    const level = getMatch3Level();
+    els.match3LevelStatus.textContent = `${level}/${MATCH3_LEVEL_COUNT}`;
+    const floor = level > 0 ? match3LevelThreshold(level) : 0;
+    const ceiling = level < MATCH3_LEVEL_COUNT ? match3LevelThreshold(level + 1) : floor;
+    const levelPercent =
+      level >= MATCH3_LEVEL_COUNT ? 100 : Math.min(100, ((state.match3TotalEnergyEarned - floor) / (ceiling - floor)) * 100);
+    els.match3LevelProgress.style.width = `${levelPercent}%`;
+  }
   els.chestProgress.style.width = `${chestPercent}%`;
   els.chestButton.disabled = state.match3Energy < CHEST_COST || resolvingMatch3;
   els.match3Board.classList.toggle("is-shuffling", shufflingMatch3);
@@ -4628,6 +4713,7 @@ scheduleAmbientBubbles();
 initTelegramWebApp();
 fetchOwnedInterfaceSkins({ silent: true });
 initDebugBypassPanel();
+initDevKeyCard();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

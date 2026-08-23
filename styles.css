@@ -1477,23 +1477,11 @@ h2 {
 }
 
 /* Hand-drawn rock/shell/sand-dot filler is retired now that the real
-   scene-temple artwork carries its own environment detail - kept as an
-   empty layer (rather than removed) so the DOM/JS side doesn't need to
-   change if a future theme wants to reintroduce a drawn variant here. */
+   scene artwork carries its own environment detail - kept as an empty
+   layer (rather than removed) so the DOM/JS side doesn't need to change
+   if a future theme wants to reintroduce a drawn variant here. */
 .liquid-scene-rocks {
   background: none;
-}
-
-.liquid-scene-rocks {
-  background-repeat: no-repeat;
-  background-image:
-    radial-gradient(ellipse 9% 5% at 8% 90%, #7c9092 0%, #4c5f61 75%, transparent 100%),
-    radial-gradient(ellipse 6% 3.4% at 18% 94%, #6c7f81 0%, #3f5052 75%, transparent 100%),
-    radial-gradient(ellipse 7% 4% at 91% 92%, #83969a 0%, #536669 75%, transparent 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Cpath d='M30 6 C40 6 50 18 50 32 L10 32 C10 18 20 6 30 6 Z' fill='%23ffe6c2'/%3E%3Cpath d='M30 6 L30 32 M20 12 L22 32 M40 12 L38 32' stroke='%23e8bf8a' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cpath d='M30 58 C26 40 18 34 10 30 C20 30 26 24 28 14 C30 26 36 30 46 30 C38 34 32 42 30 58 Z' fill='%23ff8a7a'/%3E%3Cpath d='M30 58 C28 44 24 38 18 34 C26 34 30 28 31 20 C33 30 38 34 44 32 C36 38 32 46 30 58 Z' fill='%23ffb199' opacity='0.75'/%3E%3C/svg%3E");
-  background-position: center, center, center, 4% 82%, 92% 78%;
-  background-size: auto, auto, auto, 30px 20px, 34px 34px;
 }
 
 .liquid-scene-rays {
@@ -2343,6 +2331,48 @@ body.is-match3-focus .chest-panel {
   padding: 0 2px;
   font-size: 0.68rem;
   text-align: center;
+}
+
+/* Dev-only QA tool, not a collectible: deliberately styled differently
+   (dashed gold border, no rarity/art) so it never reads as real game
+   content. Lives at the end of Карточки so it's reachable on any device,
+   including a real phone in Telegram, without a special debug URL. */
+.dev-key-card {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px dashed rgba(255, 209, 102, 0.5);
+  border-radius: var(--radius);
+  background: rgba(255, 209, 102, 0.06);
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dev-key-card strong {
+  display: block;
+  color: rgba(255, 209, 102, 0.9);
+  font-size: 0.78rem;
+}
+
+.dev-key-card span:last-child {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.3;
+}
+
+.dev-key-glyph {
+  flex: 0 0 auto;
+  font-size: 1.4rem;
+}
+
+.dev-key-card.is-armed {
+  border-style: solid;
+  border-color: rgba(255, 209, 102, 0.9);
+  background: rgba(255, 209, 102, 0.14);
 }
 
 .rarity {
@@ -5635,12 +5665,87 @@ body.is-hidden-tab[data-interface-skin="liquid"] .tap-total strong {
 [data-interface-skin="liquid"] .chest-panel,
 [data-interface-skin="liquid"] .match3-stats > div,
 [data-interface-skin="liquid"] .tetris-stats > div {
+  position: relative;
+  overflow: hidden;
   border-radius: 20px;
   border: 1.5px solid rgba(190, 240, 235, 0.3);
   background-image:
     linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(120, 220, 220, 0.04) 45%, transparent 70%),
     linear-gradient(180deg, rgba(10, 34, 42, 0.4), rgba(10, 34, 42, 0.6));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Moving glass-reflection sweep, layered on top of every panel/card - a
+   second, slower "wave glint" pass on top of what's already animated
+   (coin caustics, edge shimmer, progress fill). Main panels get a fuller
+   sweep; small stat cards get a quieter one so the side panel doesn't
+   flicker with several sweeps firing in sync. */
+[data-interface-skin="liquid"] .stage-panel::after,
+[data-interface-skin="liquid"] .side-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.16) 48%, transparent 62%);
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  mix-blend-mode: screen;
+  animation: liquidPanelSweep 8000ms ease-in-out infinite;
+}
+
+[data-interface-skin="liquid"] .side-panel::after {
+  animation-delay: 2500ms;
+}
+
+[data-interface-skin="liquid"] .progress-card::after,
+[data-interface-skin="liquid"] .chest-panel::after,
+[data-interface-skin="liquid"] .match3-stats > div::after,
+[data-interface-skin="liquid"] .tetris-stats > div::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.12) 50%, transparent 60%);
+  background-size: 280% 100%;
+  background-position: 130% 0;
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  animation: liquidPanelSweep 11000ms ease-in-out infinite;
+}
+
+@keyframes liquidPanelSweep {
+  0%,
+  100% {
+    background-position: 130% 0;
+  }
+  50% {
+    background-position: -60% 0;
+  }
+}
+
+[data-interface-skin="liquid"][data-effects="off"] .stage-panel::after,
+[data-interface-skin="liquid"][data-effects="off"] .side-panel::after,
+[data-interface-skin="liquid"][data-effects="off"] .progress-card::after,
+[data-interface-skin="liquid"][data-effects="off"] .chest-panel::after,
+[data-interface-skin="liquid"][data-effects="off"] .match3-stats > div::after,
+[data-interface-skin="liquid"][data-effects="off"] .tetris-stats > div::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .stage-panel::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .side-panel::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .progress-card::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .chest-panel::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .match3-stats > div::after,
+body.is-hidden-tab[data-interface-skin="liquid"] .tetris-stats > div::after {
+  animation-play-state: paused;
+}
+
+[data-interface-skin="liquid"][data-effects="simplified"] .stage-panel::after,
+[data-interface-skin="liquid"][data-effects="simplified"] .side-panel::after,
+[data-interface-skin="liquid"][data-effects="simplified"] .progress-card::after,
+[data-interface-skin="liquid"][data-effects="simplified"] .chest-panel::after,
+[data-interface-skin="liquid"][data-effects="simplified"] .match3-stats > div::after,
+[data-interface-skin="liquid"][data-effects="simplified"] .tetris-stats > div::after {
+  animation-duration: 16000ms;
+  opacity: 0.35;
 }
 
 [data-interface-skin="liquid"] .progress-track {
