@@ -2588,13 +2588,30 @@ function startCompanionAmbientLoop() {
   queueNextScene(7_000 + Math.random() * 5_000);
 }
 
+// CSS-driven feedback nodes (float numbers, sparks, comic bursts) rely on
+// "animationend" to remove themselves. If prefers-reduced-motion collapses
+// their animation to ~0 duration, some browsers (notably Android WebViews)
+// never fire that event, so the node - and everything's cleanup - is skipped
+// forever. A fallback timer guarantees removal either way.
+function spawnFeedbackNode(container, node, fallbackMs = 1200) {
+  container.append(node);
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    node.remove();
+  };
+  node.addEventListener("animationend", remove, { once: true });
+  window.setTimeout(remove, fallbackMs);
+  return remove;
+}
+
 function spawnCompanionFocus(x, y) {
   const node = document.createElement("span");
   node.className = "companion-focus-dot";
   node.style.setProperty("--x", `${x}px`);
   node.style.setProperty("--y", `${y}px`);
-  els.tapFeedback.append(node);
-  node.addEventListener("animationend", () => node.remove(), { once: true });
+  spawnFeedbackNode(els.tapFeedback, node);
 }
 
 function decayIntervalForHeat(heat) {
@@ -2771,8 +2788,7 @@ function spawnTapComicBurst(tapRect, zoneRect, color, text = pick(tapComicBursts
   node.style.setProperty("--comic-paper", palette[0]);
   node.style.setProperty("--comic-accent", palette[1]);
   node.style.setProperty("--comic-ink", palette[2]);
-  els.tapFeedback.append(node);
-  node.addEventListener("animationend", () => node.remove(), { once: true });
+  spawnFeedbackNode(els.tapFeedback, node);
 }
 
 function spawnFloatNumber(x, y, power) {
@@ -2781,8 +2797,7 @@ function spawnFloatNumber(x, y, power) {
   node.textContent = `+${formatShort(power)}`;
   node.style.setProperty("--x", `${x}px`);
   node.style.setProperty("--y", `${y}px`);
-  els.tapFeedback.append(node);
-  node.addEventListener("animationend", () => node.remove(), { once: true });
+  spawnFeedbackNode(els.tapFeedback, node);
 }
 
 function spawnSparks(x, y, color) {
@@ -2794,8 +2809,7 @@ function spawnSparks(x, y, color) {
   wave.style.setProperty("--x", `${x}px`);
   wave.style.setProperty("--y", `${y}px`);
   wave.style.setProperty("--wave-color", tapEffect.colors[0]);
-  els.tapFeedback.append(wave);
-  wave.addEventListener("animationend", () => wave.remove(), { once: true });
+  spawnFeedbackNode(els.tapFeedback, wave);
 
   for (let i = 0; i < tapEffect.count; i += 1) {
     const spark = els.sparkTemplate.content.firstElementChild.cloneNode(true);
@@ -2811,8 +2825,7 @@ function spawnSparks(x, y, color) {
     spark.style.setProperty("--spark-delay", `${Math.random() * 38}ms`);
     spark.style.setProperty("--spark-time", `${620 + Math.random() * 260}ms`);
     spark.style.setProperty("--spark-color", palette[i % palette.length]);
-    els.tapFeedback.append(spark);
-    spark.addEventListener("animationend", () => spark.remove(), { once: true });
+    spawnFeedbackNode(els.tapFeedback, spark);
   }
 }
 
