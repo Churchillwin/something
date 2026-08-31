@@ -1589,6 +1589,12 @@ body.is-hidden-tab[data-interface-skin="liquid"] .liquid-scene-current {
     radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.24), transparent 44%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(7, 14, 26, 0.18));
   cursor: pointer;
+  /* Rapid taps or a stray focus (tab key, selection) trigger the browser's
+     own default highlight on a <button> - a plain rectangle, since it has
+     no idea this element is round. Killed here and replaced below with a
+     ring that actually follows the coin's circle. */
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
   box-shadow:
     0 24px 58px rgba(0, 0, 0, 0.38),
     0 0 0 2px color-mix(in srgb, var(--skin-glow, var(--teal)) 16%, transparent),
@@ -1596,8 +1602,17 @@ body.is-hidden-tab[data-interface-skin="liquid"] .liquid-scene-current {
   transition:
     transform 130ms ease,
     filter 180ms ease,
-    opacity 220ms ease;
+    opacity 220ms ease,
+    box-shadow 130ms ease;
   touch-action: manipulation;
+}
+
+.tap-button:focus-visible {
+  box-shadow:
+    0 24px 58px rgba(0, 0, 0, 0.38),
+    0 0 0 2px color-mix(in srgb, var(--skin-glow, var(--teal)) 16%, transparent),
+    0 0 34px color-mix(in srgb, var(--skin-glow, var(--teal)) 42%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--skin-glow, var(--teal)) 55%, white 15%);
 }
 
 .tap-zone.is-coin-hug .tap-button {
