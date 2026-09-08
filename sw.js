@@ -1,4 +1,4 @@
-const CACHE_NAME = "anime-tap-clicker-v43";
+const CACHE_NAME = "anime-tap-clicker-v44";
 const STATIC_ASSETS = [
   "./",
   "./index.html",

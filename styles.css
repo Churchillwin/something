@@ -3391,6 +3391,10 @@ body.is-match3-focus .chest-panel {
   will-change: transform, opacity, filter;
 }
 
+.bomb-skin.is-anim-bomb {
+  will-change: transform, filter;
+}
+
 .match3-fx-layer {
   position: fixed;
   inset: 0;
@@ -3715,6 +3719,19 @@ body.is-match3-focus .chest-panel {
 .gem:hover {
   transform: translateY(-1px);
   filter: brightness(1.08);
+}
+
+.match3-board.is-resolving .gem {
+  transition: none;
+  transform: none;
+}
+
+.match3-board.is-resolving .gem .gem-crystal {
+  transform: translate(-50%, -50%);
+}
+
+.match3-board.is-resolving .gem .bomb-skin {
+  transform: none;
 }
 
 .gem:hover .gem-mineral,

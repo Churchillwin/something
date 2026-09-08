@@ -25,11 +25,11 @@ function getMatch3Level() {
 const COMPANION_DROP_CHANCE = 0.35;
 const COMPANION_PITY_CHESTS = 3;
 const COMPANION_SLEEP_DELAY = 22_000;
-const MATCH3_SWAP_DURATION = 285;
+const MATCH3_SWAP_DURATION = 240;
 const MATCH3_CLEAR_DURATION = 205;
 const MATCH3_CLEAR_STAGGER = 16;
-const MATCH3_FALL_MIN_DURATION = 260;
-const MATCH3_FALL_MAX_DURATION = 470;
+const MATCH3_FALL_MIN_DURATION = 300;
+const MATCH3_FALL_MAX_DURATION = 510;
 const MATCH3_MAX_ACTIVE_PARTICLES = 84;
 const COMBO_WINDOW = 900;
 
@@ -1434,7 +1434,6 @@ function applyClearPlan(plan, specialSpawns = []) {
 }
 
 function collapseBoard() {
-  const previousBoard = [...state.match3Board];
   const moved = new Map();
   const cellPitch = getMatch3CellPitch();
 
@@ -1459,15 +1458,14 @@ function collapseBoard() {
         if (isGemCell(state.match3Board[index])) stack.push({ cell: state.match3Board[index], fromRow: row });
       }
 
+      const refillDistance = segmentBottom - segmentTop - stack.length;
       for (let row = segmentBottom; row > segmentTop; row -= 1) {
         const index = row * BOARD_SIZE + col;
         const nextItem = stack.shift();
         const nextCell = nextItem?.cell ?? createDropCell();
         state.match3Board[index] = nextCell;
-        if (previousBoard[index] !== nextCell) {
-          const rowsMoved = nextItem ? Math.max(1, row - nextItem.fromRow) : Math.max(1, row - segmentTop);
-          moved.set(index, Math.max(cellPitch, rowsMoved * cellPitch));
-        }
+        const rowsMoved = nextItem ? row - nextItem.fromRow : refillDistance;
+        if (rowsMoved > 0) moved.set(index, rowsMoved * cellPitch);
       }
 
       segmentBottom = segmentTop - 1;
@@ -1595,7 +1593,7 @@ async function playGemSwap(firstIndex, secondIndex, { invalidReturn = false } = 
   const secondDx = -firstDx;
   const secondDy = -firstDy;
   const duration = invalidReturn ? 230 : MATCH3_SWAP_DURATION;
-  const easing = invalidReturn ? "cubic-bezier(0.22, 0.82, 0.28, 1)" : "cubic-bezier(0.18, 0.72, 0.2, 1)";
+  const easing = invalidReturn ? "cubic-bezier(0.22, 0.82, 0.28, 1)" : "cubic-bezier(0.22, 0.68, 0.3, 1)";
   const wiggleX = invalidReturn ? (Math.abs(firstDx) > Math.abs(firstDy) ? 5 : 0) : 0;
   const wiggleY = invalidReturn ? (Math.abs(firstDy) >= Math.abs(firstDx) ? 5 : 0) : 0;
 
@@ -1612,8 +1610,7 @@ async function playGemSwap(firstIndex, secondIndex, { invalidReturn = false } = 
         ]
       : [
           { transform: "translate3d(0, 0, 0) scale(1)", offset: 0 },
-          { transform: `translate3d(${dx * 0.28}px, ${dy * 0.28}px, 0) scale(1.08, 0.96)`, offset: 0.24 },
-          { transform: `translate3d(${dx * 0.72}px, ${dy * 0.72}px, 0) scale(1.03, 1.04)`, offset: 0.66 },
+          { transform: `translate3d(${dx * 0.5}px, ${dy * 0.5}px, 0) scale(1.06)`, offset: 0.5 },
           { transform: `translate3d(${dx}px, ${dy}px, 0) scale(1)`, offset: 1 },
         ];
 
@@ -2061,22 +2058,22 @@ async function playMatch3ClearAnimation(clearPlan, clearingBlockerIndexes) {
     );
   });
 
-  animations.push(spawnMatch3ShatterPieces(clearPlan.clearGems, clearingBlockerIndexes, clearPlan.blastCells, anchorIndex));
-  animations.push(spawnMatch3Debris(clearPlan.clearGems, clearingBlockerIndexes, clearPlan.blastCells, anchorIndex));
+  // Detached fragments can finish over the refill; the cells themselves must finish first.
+  runVisualAnimation(spawnMatch3ShatterPieces(clearPlan.clearGems, clearingBlockerIndexes, clearPlan.blastCells, anchorIndex));
+  runVisualAnimation(spawnMatch3Debris(clearPlan.clearGems, clearingBlockerIndexes, clearPlan.blastCells, anchorIndex));
   await Promise.all(animations);
 }
 
 async function playGemFallAnimations(fallMap) {
   if (!fallMap.size) return;
-  await nextAnimationFrame();
-  const maxDistance = Math.max(...fallMap.values(), 1);
+  // Install starting transforms before the newly rendered board can paint.
+  const cellPitch = getMatch3CellPitch();
   const animations = [...fallMap.entries()].map(([index, distance]) => {
     const node = getMatch3Cell(index);
     if (!node) return Promise.resolve();
-    const normalizedDistance = Math.min(1, distance / maxDistance);
+    const normalizedDistance = Math.min(1, Math.max(0, (distance / cellPitch - 1) / (BOARD_SIZE - 1)));
     const duration = MATCH3_FALL_MIN_DURATION + (MATCH3_FALL_MAX_DURATION - MATCH3_FALL_MIN_DURATION) * normalizedDistance;
-    const delay = Math.min(48, Math.floor(index / BOARD_SIZE) * 6 + (index % BOARD_SIZE) * 3);
-    const sway = Math.sin(index * 1.73) * Math.min(9, 3 + distance * 0.035);
+    const delay = (index % BOARD_SIZE) * 5;
 
     return withAnimationClass(
       node,
@@ -2084,14 +2081,11 @@ async function playGemFallAnimations(fallMap) {
       animateNode(
         node,
         [
-          { opacity: 0.22, transform: `translate3d(${sway * -0.35}px, ${-distance}px, 0) scale(0.86, 1.13)` },
-          { opacity: 0.88, transform: `translate3d(${sway}px, ${-distance * 0.48}px, 0) scale(0.94, 1.08)`, offset: 0.34 },
-          { opacity: 1, transform: `translate3d(${sway * -0.28}px, 5px, 0) scale(1.03, 0.97)`, offset: 0.76 },
-          { opacity: 1, transform: "translate3d(0, -3px, 0) scale(0.98, 1.04)", offset: 0.88 },
-          { opacity: 1, transform: "translate3d(0, 0, 0) scale(1.05, 0.92)", offset: 0.95 },
+          { opacity: 1, transform: `translate3d(0, ${-distance}px, 0) scale(1)`, easing: "cubic-bezier(0.25, 0.46, 0.35, 1)" },
+          { opacity: 1, transform: "translate3d(0, 0, 0) scale(1.06, 0.90)", offset: 0.84, easing: "ease-out" },
           { opacity: 1, transform: "translate3d(0, 0, 0) scale(1)" },
         ],
-        { duration, delay, easing: "cubic-bezier(0.18, 0.64, 0.22, 1)" },
+        { duration, delay, easing: "linear" },
       ),
     );
   });
@@ -2301,10 +2295,10 @@ function playBombEffect(bombType, index) {
     playBombDetonationCore(rect, color, bombType, 60),
     playBombShockwave(rect, color, bombType, 155),
     withAnimationClass(
-      node,
+      node.querySelector(".bomb-skin") || node,
       "is-anim-bomb",
       animateNode(
-        node,
+        node.querySelector(".bomb-skin") || node,
         [
           { transform: "translate3d(0, 0, 0) scale(1)", filter: "brightness(1)" },
           { transform: "translate3d(0, -2px, 0) scale(1.14)", filter: "brightness(1.45)", offset: 0.36 },
@@ -2341,14 +2335,6 @@ function playBombEffects(triggeredBombs) {
   return Promise.all([...triggeredBombs].map((index) => playBombEffect(getCellBombType(state.match3Board[index]), index)));
 }
 
-function getClearHoldDuration(clearPlan) {
-  if (!clearPlan.triggeredBombs.size) return 150;
-  const triggeredTypes = [...clearPlan.triggeredBombs].map((index) => getCellBombType(state.match3Board[index]));
-  if (triggeredTypes.some((type) => ["horizontal", "vertical", "cross", "diagonal", "large"].includes(type))) return 610;
-  if (triggeredTypes.includes("medium")) return 540;
-  return 430;
-}
-
 function getDebugGemIndexes() {
   const center = (BOARD_SIZE - 1) / 2;
   const indexes = state.match3Board
@@ -2367,6 +2353,20 @@ function getDebugGemIndexes() {
 }
 
 async function runMatch3DebugAnimation(type) {
+  if (resolvingMatch3 || shufflingMatch3) return;
+  const board = [...state.match3Board];
+  resolvingMatch3 = true;
+  try {
+    await previewMatch3Animation(type);
+  } finally {
+    state.match3Board = board;
+    resolvingMatch3 = false;
+    els.match3Board.__lastHTML = null;
+    renderMatch3();
+  }
+}
+
+async function previewMatch3Animation(type) {
   if (!isMatch3Unlocked()) {
     state.taps = MATCH3_UNLOCK_THRESHOLD;
     render();
@@ -2380,6 +2380,9 @@ async function runMatch3DebugAnimation(type) {
   if (type === "swap") return playGemSwap(first, second);
   if (type === "invalid") {
     await playGemSwap(first, second);
+    swapGems(first, second);
+    els.match3Board.__lastHTML = null;
+    renderMatch3();
     return playGemSwap(first, second, { invalidReturn: true });
   }
   if (type === "clear") {
@@ -3112,7 +3115,12 @@ async function activateMatch3Bomb(index) {
   if (resolvingMatch3 || shufflingMatch3 || !isMatch3Unlocked() || !getCellBombType(state.match3Board[index])) return;
   resolvingMatch3 = true;
   selectedGemIndex = null;
-  await resolveMatch3(new Set(), { directBombs: [index], swapIndexes: [index] });
+  try {
+    await resolveMatch3(new Set(), { directBombs: [index], swapIndexes: [index] });
+  } finally {
+    resolvingMatch3 = false;
+    renderMatch3();
+  }
 }
 
 function getSwipeNeighborIndex(index, dx, dy) {
@@ -3135,7 +3143,7 @@ function getSwipeNeighborIndex(index, dx, dy) {
 
 function handleMatch3PointerDown(event) {
   const button = event.target.closest("[data-gem-index]");
-  if (!button || resolvingMatch3 || shufflingMatch3 || !isMatch3Unlocked()) return;
+  if (!button || event.isPrimary === false || event.button !== 0 || resolvingMatch3 || shufflingMatch3 || !isMatch3Unlocked()) return;
 
   const index = Number(button.dataset.gemIndex);
   if (!isGemCell(state.match3Board[index])) return;
@@ -3207,6 +3215,17 @@ async function reshuffleMatch3Board() {
 }
 
 async function tryMatch3Swap(firstIndex, secondIndex) {
+  if (resolvingMatch3 || shufflingMatch3 || !isMatch3Unlocked() || !areAdjacent(firstIndex, secondIndex) ||
+      !isGemCell(state.match3Board[firstIndex]) || !isGemCell(state.match3Board[secondIndex])) return;
+  try {
+    await performMatch3Swap(firstIndex, secondIndex);
+  } finally {
+    resolvingMatch3 = false;
+    renderMatch3();
+  }
+}
+
+async function performMatch3Swap(firstIndex, secondIndex) {
   resolvingMatch3 = true;
   selectedGemIndex = null;
 
@@ -3215,6 +3234,7 @@ async function tryMatch3Swap(firstIndex, secondIndex) {
   await playGemSwap(firstIndex, secondIndex);
 
   swapGems(firstIndex, secondIndex);
+  els.match3Board.__lastHTML = null;
   renderMatch3();
   await nextAnimationFrame();
 
@@ -3231,6 +3251,7 @@ async function tryMatch3Swap(firstIndex, secondIndex) {
     }
     await playGemSwap(firstIndex, secondIndex, { invalidReturn: true });
     swapGems(firstIndex, secondIndex);
+    els.match3Board.__lastHTML = null;
     resolvingMatch3 = false;
     renderMatch3();
     return;
@@ -3265,8 +3286,8 @@ async function resolveMatch3(initialMatches, { directBombs = [], swapIndexes = [
         .filter(([index, hits]) => getBlockerHp(state.match3Board[index]) - hits <= 0)
         .map(([index]) => index),
     );
-    runVisualAnimation(playBombEffects(clearPlan.triggeredBombs));
-    runVisualAnimation(playMatch3ClearAnimation(clearPlan, clearingBlockerIndexes));
+    const bombAnimation = playBombEffects(clearPlan.triggeredBombs);
+    await playMatch3ClearAnimation(clearPlan, clearingBlockerIndexes);
 
     const destroyedBlockers = applyClearPlan(clearPlan, specialSpawns);
     const energyGain = (clearPlan.clearGems.size * 25 + destroyedBlockers * 75 + clearPlan.triggeredBombs.size * 120) * chain;
@@ -3281,12 +3302,11 @@ async function resolveMatch3(initialMatches, { directBombs = [], swapIndexes = [
       );
     }
     renderMatch3();
-    await sleep(getMotionDuration(getClearHoldDuration(clearPlan)));
+    await bombAnimation;
 
     const fallMap = collapseBoard();
     renderMatch3();
-    runVisualAnimation(playGemFallAnimations(fallMap));
-    await sleep(getMotionDuration(fallMap.size ? 170 : 55));
+    await playGemFallAnimations(fallMap);
 
     matches = findMatches(state.match3Board);
     queuedBombs = new Set();
@@ -4023,6 +4043,8 @@ function renderMatch3() {
   els.chestProgress.style.width = `${chestPercent}%`;
   els.chestButton.disabled = state.match3Energy < CHEST_COST || resolvingMatch3;
   els.match3Board.classList.toggle("is-shuffling", shufflingMatch3);
+  els.match3Board.classList.toggle("is-resolving", resolvingMatch3);
+  els.match3Board.setAttribute("aria-busy", String(resolvingMatch3));
   els.match3ShuffleButton.classList.toggle("is-needed", shuffleNeeded);
   els.match3ShuffleButton.setAttribute("aria-label", shuffleLabel);
   els.match3ShuffleButton.title = shuffleLabel;
@@ -4664,8 +4686,8 @@ els.pauseButton.addEventListener("click", togglePause);
 els.match3ShuffleButton.addEventListener("click", reshuffleMatch3Board);
 els.match3FocusButton.addEventListener("click", () => setMatch3FocusMode(!match3FocusMode));
 els.match3Board.addEventListener("pointerdown", handleMatch3PointerDown);
-els.match3Board.addEventListener("pointerup", handleMatch3PointerUp);
-els.match3Board.addEventListener("pointercancel", handleMatch3PointerCancel);
+window.addEventListener("pointerup", handleMatch3PointerUp);
+window.addEventListener("pointercancel", handleMatch3PointerCancel);
 els.match3Board.addEventListener("click", handleGemClick);
 els.chestButton.addEventListener("click", openChest);
 

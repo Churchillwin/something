@@ -191,27 +191,22 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 
     if (valid) {
       await ensureUser(env.DB, fromId);
-      // UNIQUE(telegram_payment_charge_id) makes a resent update a no-op.
-      const insert = await env.DB.prepare(
-        `INSERT OR IGNORE INTO payments
+      // Record payment and entitlement atomically so a retry cannot lose a paid skin.
+      await env.DB.batch([
+        env.DB.prepare(
+          `INSERT OR IGNORE INTO payments
            (telegram_payment_charge_id, telegram_user_id, product_id, amount, currency, invoice_payload)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
-      )
-        .bind(payment.telegram_payment_charge_id, fromId, payload.productId, payment.total_amount, payment.currency, payment.invoice_payload)
-        .run();
-
-      if (insert.meta.changes > 0) {
-        const paymentRow = await env.DB.prepare(`SELECT id FROM payments WHERE telegram_payment_charge_id = ?1`)
-          .bind(payment.telegram_payment_charge_id)
-          .first<{ id: number }>();
-        await env.DB.prepare(
+        ).bind(payment.telegram_payment_charge_id, fromId, payload.productId, payment.total_amount, payment.currency, payment.invoice_payload),
+        env.DB.prepare(
           `INSERT INTO entitlements (telegram_user_id, product_id, theme_id, status, purchase_id)
-           VALUES (?1, ?2, ?3, 'owned', ?4)
-           ON CONFLICT(telegram_user_id, product_id) DO UPDATE SET status = 'owned', purchase_id = excluded.purchase_id`,
+           SELECT ?1, ?2, ?3, 'owned', id FROM payments
+           WHERE telegram_payment_charge_id = ?4 AND telegram_user_id = ?1 AND product_id = ?2 AND status = 'confirmed'
+           ON CONFLICT(telegram_user_id, product_id) DO UPDATE SET status = 'owned', purchase_id = excluded.purchase_id
+           WHERE entitlements.purchase_id IS NOT excluded.purchase_id`,
         )
-          .bind(fromId, payload.productId, product!.themeId, paymentRow?.id ?? null)
-          .run();
-      }
+          .bind(fromId, payload.productId, product!.themeId, payment.telegram_payment_charge_id),
+      ]);
     }
   }
 
